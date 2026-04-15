@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Taser 7 - Fullfjädrad Simulator v2.2</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #121212; 
+            color: #ecf0f1; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 10px;
+            margin: 0;
+            gap: 15px;
+            overflow-x: hidden;
+        }
+
+        h1.main-title {
+            color: #f1c40f; margin: 0 0 10px 0; font-size: 22px; letter-spacing: 2px;
+            text-align: center; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* ----- VY FRAMÅT (MÅLBILDEN) ----- */
+        .target-view {
+            width: 100%; max-width: 400px; height: 350px; /* Högre för att visa gubben bra */
+            background-color: #fff; /* Vit bakgrund för bilden */
+            border: 3px solid #333; border-radius: 10px;
+            position: relative; overflow: hidden; box-shadow: inset 0 0 30px #000;
+            background-image: url('image_fd5cbc.png'); 
+            background-size: 200% 100%; /* Delar bilden i två (vänster/höger) */
+            background-repeat: no-repeat;
+            transition: background-color 0.1s;
+        }
+
+        .target-front { background-position: left center; }
+        .target-back { background-position: right center; }
+
+        .target-view.flash { animation: strobe 0.1s infinite alternate; }
+        @keyframes strobe {
+            0% { filter: brightness(1); }
+            100% { filter: brightness(0.3); }
+        }
+
+        .target-view.fail-flash { animation: redStrobe 0.2s 3; }
+        @keyframes redStrobe {
+            0% { box-shadow: inset 0 0 50px rgba(255,0,0,0.8); background-color: rgba(255,0,0,0.3); }
+            100% { box-shadow: inset 0 0 0px transparent; background-color: transparent; }
+        }
+
+        .target-label { position: absolute; top: 10px; left: 10px; color: #222; font-size: 11px; font-weight: bold; z-index: 10; background: rgba(255,255,255,0.7); padding: 2px 5px; border-radius: 3px;}
+
+        .flashlight-beam {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.2) 40%, transparent 70%); display: none; pointer-events: none;
+        }
+
+        .laser-green, .laser-red {
+            position: absolute; width: 8px; height: 8px; border-radius: 50%; display: none; transition: top 0.3s ease; transform: translate(-50%, -50%); pointer-events: none;
+        }
+        .laser-green { background-color: #00ff00; box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00; top: 35%; left: 50%; }
+        .laser-red { background-color: #ff0000; box-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000; top: 75%; left: 50%; animation: blinkLaser 0.15s infinite alternate; }
+
+        @keyframes blinkLaser { 0% { opacity: 0.2; transform: translate(-50%, -50%) scale(0.8); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } }
+
+        .lightning {
+            position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(168,235,18,0.2) 0%, transparent 60%); display: none; z-index: 5; pointer-events: none;
+        }
+        .lightning::before, .lightning::after {
+            content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 4px; background: #fff;
+            box-shadow: 0 0 15px #a8eb12, 0 0 30px #a8eb12; animation: electricity 0.05s infinite alternate;
+        }
+        .lightning::after { transform: rotate(15deg); }
+
+        .dart-hit {
+            position: absolute; width: 8px; height: 8px; background-color: #fff; border-radius: 50%;
+            box-shadow: 0 0 5px #fff, 0 0 12px #a8eb12, 0 0 20px #a8eb12; transform: translate(-50%, -50%);
+            z-index: 15; animation: spark 0.1s infinite alternate; pointer-events: none;
+        }
+        @keyframes spark { 0% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.8); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } }
+
+        /* HUVUDLAYOUT */
+        .simulator-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 400px; transform-origin: top center; }
+        @media (max-width: 340px) { .simulator-wrapper { transform: scale(0.85); } .target-view { max-width: 340px; } }
+        
+        .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; }
+
+        /* ----- TASER 7 ENHET ----- */
+        .taser-device {
+            width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%);
+            border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.8), inset 0 5px 15px rgba(255,255,255,0.1);
+            position: relative; padding-bottom: 25px; border: 2px solid #111; z-index: 2;
+        }
+
+        .warning-arc {
+            position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px;
+            background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px);
+            filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none;
+            animation: electricity 0.05s infinite alternate; z-index: 20;
+        }
+
+        .sights { display: flex; justify-content: center; gap: 40px; padding-top: 15px; }
+        .sight-dot { width: 12px; height: 12px; background-color: #fff; border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
+
+        .display-bezel {
+            background-color: #111; margin: 15px auto; width: 200px; height: 80px; border-radius: 10px; border: 3px solid #000;
+            display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+        }
+        .display-screen {
+            width: 180px; height: 60px; background-color: #050505; color: #ffff00; font-family: 'Courier New', Courier, monospace;
+            font-size: 16px; font-weight: bold; display: flex; justify-content: center; align-items: center; border-radius: 5px;
+            transition: all 0.2s; text-align: center;
+        }
+        .display-screen.inverted { background-color: #ffff00; color: #050505; }
+        .display-screen.dimmed { opacity: 0.3; }
+
+        .display-icons { display: flex; gap: 15px; align-items: flex-end; padding-bottom: 5px; }
+        .chamber-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .icon-cassette { width: 30px; height: 30px; border: 3px solid transparent; border-radius: 2px; box-sizing: border-box; }
+        .icon-cassette.loaded { border-color: #ffff00; }
+        .inverted .icon-cassette.loaded { border-color: #050505; }
+        .icon-cassette.fired {
+            border-color: #ffff00;
+            background: linear-gradient(to top right, transparent calc(50% - 2px), #ffff00 calc(50% - 1px), #ffff00 calc(50% + 1px), transparent calc(50% + 2px)),
+                        linear-gradient(to bottom right, transparent calc(50% - 2px), #ffff00 calc(50% - 1px), #ffff00 calc(50% + 1px), transparent calc(50% + 2px));
+        }
+        .inverted .icon-cassette.fired {
+            border-color: #050505;
+            background: linear-gradient(to top right, transparent calc(50% - 2px), #050505 calc(50% - 1px), #050505 calc(50% + 1px), transparent calc(50% + 2px)),
+                        linear-gradient(to bottom right, transparent calc(50% - 2px), #050505 calc(50% - 1px), #050505 calc(50% + 1px), transparent calc(50% + 2px));
+        }
+        .icon-battery-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 9px; }
+        .batt-nub { width: 10px; height: 5px; background-color: transparent; }
+        .batt-body { width: 18px; height: 32px; border: 2px solid transparent; box-sizing: border-box; border-radius: 1px; }
+        .icon-battery-wrap.full .batt-nub { background-color: #ffff00; }
+        .icon-battery-wrap.full .batt-body { background-color: #ffff00; border-color: #ffff00; }
+        .inverted .icon-battery-wrap.full .batt-nub { background-color: #050505; }
+        .inverted .icon-battery-wrap.full .batt-body { background-color: #050505; border-color: #050505; }
+        .active-line { width: 36px; height: 4px; background-color: transparent; }
+        .active-line.show { background-color: #ffff00; }
+        .inverted .active-line.show { background-color: #050505; }
+
+        .warning-btn-wrapper { position: absolute; top: 130px; width: 30px; height: 70px; }
+        .warning-btn-wrapper.left { left: -15px; }
+        .warning-btn-wrapper.right { right: -15px; }
+        .warning-btn {
+            width: 100%; height: 100%; background: linear-gradient(to right, #444, #222); border: 2px solid #000; border-radius: 8px; cursor: pointer;
+            box-shadow: 3px 0 5px rgba(0,0,0,0.5), inset -2px 0 5px rgba(255,255,255,0.2); transition: all 0.1s; touch-action: manipulation;
+        }
+        .warning-btn-wrapper.left .warning-btn { border-radius: 8px 0 0 8px; background: linear-gradient(to left, #444, #222); box-shadow: -3px 0 5px rgba(0,0,0,0.5), inset 2px 0 5px rgba(255,255,255,0.2); }
+        .warning-btn-wrapper.right .warning-btn { border-radius: 0 8px 8px 0; }
+        .warning-btn:active, .warning-btn.active-press { transform: scaleX(0.8); background: #111; box-shadow: inset 0 0 10px rgba(52, 152, 219, 0.5); }
+
+        .safety-container { display: flex; justify-content: center; margin-top: 30px; }
+        .safety-switch {
+            width: 90px; height: 45px; background-color: #27ae60; border: 4px solid #111; border-radius: 25px; cursor: pointer; position: relative; transition: background-color 0.3s;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.6); touch-action: manipulation;
+        }
+        .safety-switch::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 33px; height: 33px; background-color: #fff; border-radius: 50%; transition: left 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .safety-switch.unsafe { background-color: #e74c3c; }
+        .safety-switch.unsafe::after { left: 47px; }
+        .safety-label { text-align: center; font-weight: bold; margin-top: 8px; color: #111; font-size: 15px; }
+
+        /* ----- KONTROLLPANEL ----- */
+        .sim-controls {
+            width: 270px; background-color: #2c3e50; padding: 40px 15px 15px 15px; border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8);
+            margin-top: -30px; border: 2px solid #1a252f; border-top: none; position: relative; z-index: 1; 
+        }
+        
+        button.action-btn {
+            width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 10px 8px; margin-bottom: 8px; border-radius: 5px; cursor: pointer;
+            font-weight: bold; font-size: 12px; touch-action: manipulation; transition: 0.1s;
+        }
+        button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
+        
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .btn-grid .action-btn { margin-bottom: 0; }
+
+        .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 12px !important;}
+        
+        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 12px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-bottom: 15px !important;}
+        .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
+        
+        .btn-kontaktstot { background-color: #e67e22 !important; border-color: #d35400 !important; font-size: 14px !important; padding: 12px !important; display: none; box-shadow: 0 3px 0 #ba4a00; margin-bottom: 15px !important;}
+        .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
+
+        .btn-gyro { background-color: #8e44ad !important; border-color: #732d91 !important; }
+        .btn-stealth { background-color: #555 !important; border-color: #333 !important; color: #ccc !important;}
+        .btn-reset { background-color: #7f8c8d !important; border-color: #626a6b !important; margin-top: 5px;}
+
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 15px; }
+        .status-box { background: #111; padding: 6px; text-align: center; border-radius: 3px; font-size: 11px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
+        .status-box.ok { border-color: #27ae60; color: #27ae60; }
+        .status-box.stealth { border-color: #9b59b6; color: #9b59b6; grid-column: span 2;}
+
+        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 10px; height: 90px; overflow-y: auto; padding: 8px; border-radius: 5px; margin-top: 10px; border: 1px solid #222;}
+        .log-entry { margin-bottom: 3px; border-bottom: 1px dotted #333; padding-bottom: 2px;}
+
+        .progress-bar-container { width: 100%; height: 6px; background: #222; border-radius: 3px; display: none; margin-bottom: 8px;}
+        .progress-bar { width: 0%; height: 100%; background: #9b59b6; transition: width 0.1s linear;}
+
+        .footer { margin-top: 20px; text-align: center; font-size: 12px; color: #7f8c8d; }
+        .footer a { color: #555; text-decoration: none; transition: color 0.2s; }
+        .footer a:hover { color: #bdc3c7; text-decoration: underline; }
+
+        /* ----- MODALER ----- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 15px;}
+        .modal-content { background: #2c3e50; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 10px; border: 2px solid #f1c40f; padding: 25px 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 10px 40px rgba(0,0,0,0.9);}
+        .modal-content.history-style { border-color: #3498db; }
+        .modal-close { position: absolute; top: 10px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
+        .modal-close:hover { color: #c0392b; }
+        .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 10px; }
+        .history-style h2 { color: #3498db; }
+        .modal-content h3 { color: #3498db; margin-top: 20px; margin-bottom: 10px; font-size: 15px; }
+        .modal-content p, .modal-content li { font-size: 13px; line-height: 1.5; color: #bdc3c7;}
+        .modal-content ul, .modal-content ol { padding-left: 20px; margin-top: 5px; }
+        .modal-content li { margin-bottom: 6px; }
+        .version-list { list-style-type: none; padding-left: 0; }
+        .version-list li { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #34495e; }
+        .version-number { font-weight: bold; color: #f1c40f; }
+    </style>
+</head>
+<body>
+
+    <div class="simulator-wrapper">
+        <h1 class="main-title">TASER 7 - Elchockvapen</h1>
+        
+        <div class="target-view target-front" id="target-view">
+            <div class="target-label" id="target-label">MÅL / VÄGG (Vy framåt)</div>
+            <div id="flashlight" class="flashlight-beam"></div>
+            <div id="laser-green" class="laser-green"></div>
+            <div id="laser-red" class="laser-red"></div>
+            <div id="lightning" class="lightning"></div>
+        </div>
+        
+        <div class="main-container">
+            <div class="taser-device">
+                <div id="warning-arc" class="warning-arc"></div>
+                <div class="sights">
+                    <div class="sight-dot"></div>
+                    <div class="sight-dot"></div>
+                </div>
+                <div class="display-bezel">
+                    <div id="taser-display" class="display-screen"></div>
+                </div>
+                <div class="warning-btn-wrapper left">
+                    <button class="warning-btn" id="warn-left" onclick="pressSingleWarning()" title="Vänster varningsknapp"></button>
+                </div>
+                <div class="warning-btn-wrapper right">
+                    <button class="warning-btn" id="warn-right" onclick="pressSingleWarning()" title="Höger varningsknapp"></button>
+                </div>
+                <div class="safety-container">
+                    <div>
+                        <div id="safety-switch" class="safety-switch" onclick="toggleSafety()"></div>
+                        <div id="safety-label" class="safety-label">SÄKRAD</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sim-controls">
+                
+                <button class="action-btn btn-info" onclick="openModal('info-modal')">ℹ️ Lathund & Instruktioner</button>
+
+                <div class="status-grid">
+                    <div id="stat-cassette" class="status-box">Kassetter ur</div>
+                    <div id="stat-battery" class="status-box">Batteri ur</div>
+                    <div id="stat-stealth" class="status-box stealth" style="display:none;">DOLT LÄGE AKTIVT</div>
+                </div>
+
+                <button class="action-btn btn-trigger" id="btn-trigger" onclick="pressTrigger()">AVFYRA SKOTT</button>
+                <button class="action-btn btn-kontaktstot" id="btn-kontaktstot" onclick="performKontaktstot()">UTFÖR KONTAKTSTÖT</button>
+                
+                <div class="btn-grid">
+                    <button class="action-btn" onclick="toggleCassette()">Kassetter i/ur</button>
+                    <button class="action-btn" onclick="toggleBattery()">Batteri i/ur</button>
+                </div>
+                
+                <button class="action-btn" style="border-color: #f1c40f; color: #f1c40f;" onclick="pressDualWarning()">Funktionskontroll (Tryck Båda)</button>
+                
+                <div class="btn-grid">
+                    <button class="action-btn btn-stealth" onclick="activateStealth()">Dolt läge</button>
+                    <button class="action-btn" onclick="tiltWeapon()">Tilt (Dator)</button>
+                </div>
+
+                <div class="progress-bar-container" id="stealth-progress-container">
+                    <div class="progress-bar" id="stealth-progress"></div>
+                </div>
+
+                <button class="action-btn btn-gyro" id="btn-gyro" onclick="initGyro()">Aktivera Gyro (Mobil)</button>
+                <button class="action-btn btn-reset" onclick="resetSimulator()">ÅTERSTÄLL SIMULATOR</button>
+
+                <div class="log-box" id="log"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="#" onclick="openModal('history-modal'); return false;">Versionshistorik</a><br><br>
+            &copy; Cullibrick 2026
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('info-modal')">×</button>
+            <h2>Lathund: Taser 7 Simulator</h2>
+            <p>Träna handhavande, "Ordna för tjänst" och verkanskontroll.</p>
+            
+            <h3>1. Målbild & NMI (Neuromuskulär inkapacitering)</h3>
+            <ul>
+                <li>För att uppnå NMI krävs en spridning mellan pilarna på minst 23 cm (optimalt över 30 cm) och en sluten krets.</li>
+                <li><strong>Gröna zoner (Godkända):</strong> Mage, ben, rygg. Försök placera en pil över och en pil under midjelinjen.</li>
+                <li><strong>Gula/Röda zoner (Undvik):</strong> Huvud, hals, nacke, genitalier samt hjärttrakten.</li>
+            </ul>
+
+            <h3>2. Skjut & Verkanskontroll</h3>
+            <ul>
+                <li>Klicka på <strong>AVFYRA SKOTT</strong>. Pilarna får en slumpmässig spridning mot målet.</li>
+                <li>Om NMI <strong>uppnås</strong>: Strömcykeln på 5 sekunder aktiveras.</li>
+                <li>Om NMI <strong>misslyckas</strong>: Skärmen blinkar rött. Vapnet byter automatiskt kammare. Du måste skjuta en gång till!</li>
+                <li><strong>Kontaktstöt:</strong> Om båda kassetterna är skjutna och NMI fortfarande saknas kan du utföra en kontaktstöt. Klicka på <strong>UTFÖR KONTAKTSTÖT</strong> för att sluta kretsen med den avfyrade pilen genom att trycka vapnet mot kroppen.</li>
+            </ul>
+
+            <h3>3. Ordna för tjänst (Funktionskontroll)</h3>
+            <ol>
+                <li>Säkerställ att vapnet är <strong>SÄKRAT</strong> (Grönt).</li>
+                <li><strong>Ladda</strong> kassetter och batteri.</li>
+                <li>Klicka på <strong>Funktionskontroll (Tryck Båda)</strong>.</li>
+                <li><strong>OSÄKRA</strong> medan displayen lyser. (Displayen blir gul).</li>
+                <li>Testa <strong>varningsbågen</strong> (klicka på varningsknappen).</li>
+                <li><strong>SÄKRA</strong> vapnet. Det är nu ordnat för tjänst.</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="history-modal" class="modal-overlay">
+        <div class="modal-content history-style">
+            <button class="modal-close" onclick="closeModal('history-modal')">×</button>
+            <h2>Versionshistorik</h2>
+            <ul class="version-list">
+                <li><span class="version-number">v2.2</span> - Nytt interaktivt målsystem! Använder bildens gubbar (Fram/Bak-vy slumpas fram). Skott ger dynamisk NMI-beräkning baserat på zon och spridning. Tillägg av <i>Kontaktstöt</i> vid dubbelmiss.</li>
+                <li><span class="version-number">v2.1</span> - Lade till dynamiska och slumpmässiga pil-träffar (visuella glödande markörer) på målytan vid avfyrning.</li>
+                <li><span class="version-number">v2.0</span> - Mobilskalning, rubrik, copyrighthänvisning och inbyggd historik.</li>
+                <li><span class="version-number">v1.9</span> - Felsäkerhetsuppdatering för ljudhantering i restriktiva webbläsare.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Loggning
+        const logBox = document.getElementById('log');
+        function log(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `> ${msg}`;
+            logBox.prepend(entry);
+        }
+        log("Simulator v2.2 startad.");
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal-overlay')) { event.target.style.display = "none"; }
+        }
+
+        // Tillstånd
+        let isSafe = true;
+        let chamber1 = "empty"; 
+        let chamber2 = "empty";
+        let hasBattery = false;
+        let displayState = "OFF"; 
+        let displayTimer = null;
+        let arcTimer = null;
+        let activeChamber = 1; 
+        
+        let stealthMode = false;
+        let gyroEnabled = false;
+        let lastTiltTime = 0;
+        let targetFacing = 'front'; // 'front' eller 'back'
+
+        // Ljud
+        let audioCtx = null;
+        let isAudioInit = false;
+        let soundInterval = null;
+
+        // DOM
+        const displayEl = document.getElementById('taser-display');
+        const safetySwitch = document.getElementById('safety-switch');
+        const safetyLabel = document.getElementById('safety-label');
+        const statCassette = document.getElementById('stat-cassette');
+        const statBattery = document.getElementById('stat-battery');
+        const statStealth = document.getElementById('stat-stealth');
+        const targetView = document.getElementById('target-view');
+        const targetLabel = document.getElementById('target-label');
+        
+        const flashlight = document.getElementById('flashlight');
+        const laserGreen = document.getElementById('laser-green');
+        const laserRed = document.getElementById('laser-red');
+        const warningArc = document.getElementById('warning-arc');
+        const lightning = document.getElementById('lightning');
+        
+        const btnLeft = document.getElementById('warn-left');
+        const btnRight = document.getElementById('warn-right');
+        const stealthProgCont = document.getElementById('stealth-progress-container');
+        const stealthProg = document.getElementById('stealth-progress');
+        const btnKontaktstot = document.getElementById('btn-kontaktstot');
+
+        function initAudio() {
+            if (!isAudioInit) {
+                isAudioInit = true;
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) { audioCtx = new AudioContext(); }
+                } catch (e) {}
+            }
+            if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
+        }
+
+        function playPopSound() {
+            initAudio(); if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square'; osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        function playElectricSound() {
+            initAudio(); if (!audioCtx) return null;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(50, audioCtx.currentTime);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start();
+                soundInterval = setInterval(() => {
+                    if(gain.gain) {
+                        gain.gain.value = Math.random() * 0.5 + 0.5; 
+                        osc.frequency.value = 50 + Math.random() * 50; 
+                    }
+                }, 30);
+                return { osc, gain };
+            } catch(e) { return null; }
+        }
+
+        function stopElectricSound(soundObj) {
+            if (soundInterval) { clearInterval(soundInterval); soundInterval = null; }
+            if (soundObj && soundObj.osc && audioCtx) {
+                try {
+                    soundObj.gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    soundObj.osc.stop(audioCtx.currentTime + 0.1);
+                } catch(e) {}
+            }
+        }
+
+        function animateWarningButtons() {
+            btnLeft.classList.add('active-press'); btnRight.classList.add('active-press');
+            setTimeout(() => { btnLeft.classList.remove('active-press'); btnRight.classList.remove('active-press'); }, 200);
+        }
+
+        // Målhantering
+        function randomizeTarget() {
+            targetFacing = Math.random() > 0.5 ? 'front' : 'back';
+            if(targetFacing === 'front') {
+                targetView.classList.remove('target-back');
+                targetView.classList.add('target-front');
+                targetLabel.textContent = "MÅL: PERSON (FRAMIFRÅN)";
+            } else {
+                targetView.classList.remove('target-front');
+                targetView.classList.add('target-back');
+                targetLabel.textContent = "MÅL: PERSON (BAKIFRÅN)";
+            }
+        }
+
+        // Vid start av simulering: Slumpa fram figur
+        randomizeTarget();
+
+        function checkNMI(x1, y1, x2, y2) {
+            // Y går från 0 (toppen av rutan) till 100 (botten). 
+            // X går från 0 till 100
+            
+            // Kolla om en pil missar kroppen helt (X utanför 25-75%)
+            if (x1 < 25 || x1 > 75 || x2 < 25 || x2 > 75) return false;
+            
+            // Kolla Gula/Röda zoner (ogiltig träff)
+            const checkZone = (x, y) => {
+                if (y < 20) return false; // Huvud/Hals (Alltid rött/gult)
+                if (targetFacing === 'front') {
+                    if (y >= 20 && y <= 40) return false; // Bröstkorg (Gult område)
+                    if (y >= 50 && y <= 62 && x >= 40 && x <= 60) return false; // Genitalier
+                }
+                return true; // Annars grön zon!
+            };
+
+            if (!checkZone(x1, y1) || !checkZone(x2, y2)) return false;
+
+            // Kolla avstånd (måste vara > 15% skillnad i Y-led för att simulera 23cm)
+            if (Math.abs(y1 - y2) < 15) return false;
+
+            return true;
+        }
+
+        function fireDarts(chamber) {
+            const topBase = 35;
+            const leftBase = 50;
+            const bottomBase = (chamber === 1) ? 75 : 50;
+            
+            // Ge spridning (risk att missa om spridningen är hög)
+            const randOffset = () => (Math.random() * 16 - 8);
+
+            let y1 = topBase + randOffset();
+            let x1 = leftBase + randOffset();
+            let y2 = bottomBase + randOffset();
+            let x2 = leftBase + randOffset();
+
+            // Rita pilar
+            const dart1 = document.createElement('div'); dart1.className = 'dart-hit';
+            dart1.style.top = y1 + '%'; dart1.style.left = x1 + '%';
+            
+            const dart2 = document.createElement('div'); dart2.className = 'dart-hit';
+            dart2.style.top = y2 + '%'; dart2.style.left = x2 + '%';
+
+            targetView.appendChild(dart1);
+            targetView.appendChild(dart2);
+
+            return checkNMI(x1, y1, x2, y2);
+        }
+
+        function clearDarts() {
+            const darts = document.querySelectorAll('.dart-hit');
+            darts.forEach(dart => dart.remove());
+        }
+
+        function updateProjectors() {
+            if (!isSafe && hasBattery && !stealthMode) {
+                flashlight.style.display = 'block';
+                laserGreen.style.display = 'block';
+                
+                let currentChamberState = activeChamber === 1 ? chamber1 : chamber2;
+                if(currentChamberState === "loaded") {
+                    laserRed.style.display = 'block';
+                    laserRed.style.top = activeChamber === 1 ? "75%" : "50%"; 
+                } else {
+                    laserRed.style.display = 'none'; 
+                }
+            } else {
+                flashlight.style.display = 'none'; laserGreen.style.display = 'none'; laserRed.style.display = 'none';
+            }
+        }
+
+        function renderIconsHTML() {
+            const getIconClass = (state) => {
+                if(state === "loaded") return "loaded";
+                if(state === "fired") return "fired";
+                return "empty";
+            };
+            const line1 = activeChamber === 1 ? "show" : "";
+            const line2 = activeChamber === 2 ? "show" : "";
+
+            return `
+                <div class="display-icons">
+                    <div class="chamber-col"><div class="icon-cassette ${getIconClass(chamber1)}"></div><div class="active-line ${line1}"></div></div>
+                    <div class="icon-battery-wrap full"><div class="batt-nub"></div><div class="batt-body"></div></div>
+                    <div class="chamber-col"><div class="icon-cassette ${getIconClass(chamber2)}"></div><div class="active-line ${line2}"></div></div>
+                </div>
+            `;
+        }
+
+        function updateDisplay() {
+            if (arcTimer) return; 
+
+            if (!hasBattery) {
+                displayEl.innerHTML = ""; displayEl.className = "display-screen"; displayState = "OFF";
+                updateProjectors(); return;
+            }
+
+            if(stealthMode) displayEl.classList.add('dimmed');
+            else displayEl.classList.remove('dimmed');
+
+            if (displayState === "BOOT") {
+                displayEl.innerHTML = "v1.4.10<br>[||||] 94%"; displayEl.classList.remove('inverted');
+            } else if (displayState === "FUNK_MODE") {
+                displayEl.innerHTML = renderIconsHTML(); displayEl.classList.add('inverted');
+            } else if (displayState === "ACTIVE") {
+                displayEl.innerHTML = renderIconsHTML(); displayEl.classList.remove('inverted');
+            } else {
+                displayEl.innerHTML = ""; displayEl.classList.remove('inverted');
+            }
+            updateProjectors();
+            
+            // Visa kontaktstöt-knapp om kassetter är slut?
+            if(chamber1 === "fired" && chamber2 === "fired" && !isSafe) {
+                btnKontaktstot.style.display = 'block';
+            } else {
+                btnKontaktstot.style.display = 'none';
+            }
+        }
+
+        function resetSimulator() {
+            log("Återställer simulator...");
+            isSafe = true; chamber1 = "empty"; chamber2 = "empty"; hasBattery = false;
+            displayState = "OFF"; activeChamber = 1; stealthMode = false;
+            
+            clearTimeout(displayTimer);
+            if(arcTimer) { clearInterval(arcTimer); arcTimer = null; }
+
+            safetySwitch.classList.remove('unsafe'); safetyLabel.textContent = "SÄKRAD";
+            statCassette.textContent = "Kassetter ur"; statCassette.classList.remove('ok');
+            statBattery.textContent = "Batteri ur"; statBattery.classList.remove('ok');
+            statStealth.style.display = 'none'; btnKontaktstot.style.display = 'none';
+            targetView.classList.remove('flash'); targetView.classList.remove('fail-flash');
+            warningArc.style.display = 'none'; lightning.style.display = 'none';
+            clearDarts();
+            randomizeTarget();
+
+            log("<span style='color:#f1c40f'>Systemet har återställts till grundläge.</span>");
+            updateDisplay();
+        }
+
+        function toggleCassette() {
+            initAudio();
+            if (!isSafe) { log("<span style='color:red'>FEL: Säkra vapnet först!</span>"); return; }
+            if (chamber1 === "empty" && chamber2 === "empty") {
+                chamber1 = "loaded"; chamber2 = "loaded";
+                statCassette.textContent = "Kassetter isatta"; statCassette.classList.add('ok');
+                log("Kassetter laddade.");
+            } else {
+                chamber1 = "empty"; chamber2 = "empty"; activeChamber = 1;
+                statCassette.textContent = "Kassetter ur"; statCassette.classList.remove('ok');
+                log("Kassetter urtagna.");
+                clearDarts(); 
+            }
+            updateDisplay();
+        }
+
+        function toggleBattery() {
+            initAudio();
+            if (!isSafe) { log("<span style='color:red'>FEL: Säkra vapnet först!</span>"); return; }
+            hasBattery = !hasBattery;
+            statBattery.textContent = hasBattery ? "Batteri isatt" : "Batteri ur";
+            statBattery.classList.toggle('ok', hasBattery);
+            log(hasBattery ? "Batteri isatt." : "Batteri urtaget.");
+            if (!hasBattery) { stealthMode = false; statStealth.style.display = 'none'; }
+            updateDisplay();
+        }
+
+        function pressDualWarning() {
+            initAudio(); animateWarningButtons();
+            if (!hasBattery) { log("Kräver batteri."); return; }
+            if (!isSafe) { log("Vapnet är redan osäkrat."); return; }
+            
+            log("Båda varningsknappar intryckta. (Osäkra nu)");
+            displayState = "BOOT"; updateDisplay();
+            
+            clearTimeout(displayTimer);
+            displayTimer = setTimeout(() => {
+                if (displayState === "BOOT" && isSafe) { displayState = "OFF"; updateDisplay(); }
+            }, 5000);
+        }
+
+        function activateStealth() {
+            initAudio();
+            if(!hasBattery) { log("Kräver batteri."); return; }
+            if(!isSafe) { log("Vapnet måste vara säkrat för att aktivera dolt läge."); return; }
+            
+            btnLeft.classList.add('active-press'); btnRight.classList.add('active-press');
+            stealthProgCont.style.display = 'block'; stealthProg.style.width = '0%';
+            
+            let progress = 0;
+            let simInterval = setInterval(() => {
+                progress += 5; stealthProg.style.width = progress + '%';
+                if(progress >= 100) {
+                    clearInterval(simInterval); stealthProgCont.style.display = 'none';
+                    btnLeft.classList.remove('active-press'); btnRight.classList.remove('active-press');
+                    stealthMode = true; statStealth.style.display = 'block';
+                    log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge aktiverat!</span>");
+                    updateDisplay();
+                }
+            }, 100);
+        }
+
+        function toggleSafety() {
+            initAudio();
+            if (arcTimer) return; 
+
+            isSafe = !isSafe;
+            if (isSafe) {
+                safetySwitch.classList.remove('unsafe'); safetyLabel.textContent = "SÄKRAD";
+                log("Vapnet är SÄKRAT.");
+                if(stealthMode) { stealthMode = false; statStealth.style.display = 'none'; log("Dolt läge avaktiverat."); }
+                if (displayState === "FUNK_MODE" || displayState === "ACTIVE") { displayState = "OFF"; }
+                updateDisplay();
+            } else {
+                safetySwitch.classList.add('unsafe'); safetyLabel.textContent = "OSÄKRAD";
+                if (displayState === "BOOT") { displayState = "FUNK_MODE"; log("Funktionskontroll aktiverad."); }
+                else if (hasBattery) { displayState = "ACTIVE"; }
+                updateDisplay();
+            }
+        }
+
+        function runCycle(msg, isFiring) {
+            initAudio();
+            if (arcTimer) return; 
+            log(`<span style='color:#3498db'>${msg} ⚡</span>`);
+            
+            if(isFiring) { targetView.classList.add('flash'); lightning.style.display = 'block'; }
+            else { warningArc.style.display = 'block'; }
+
+            let electricSound = playElectricSound();
+            let count = 1; displayEl.innerHTML = "5 SEK<br>CYKEL: " + count;
+            
+            arcTimer = setInterval(() => {
+                count++;
+                if (count > 5) {
+                    clearInterval(arcTimer); arcTimer = null;
+                    targetView.classList.remove('flash'); warningArc.style.display = 'none'; lightning.style.display = 'none';
+                    stopElectricSound(electricSound);
+                    log("Strömcykel avslutad.");
+                    updateDisplay(); 
+                } else {
+                    displayEl.innerHTML = "5 SEK<br>CYKEL: " + count;
+                }
+            }, 1000);
+        }
+
+        function pressSingleWarning() {
+            initAudio(); animateWarningButtons();
+            if (!hasBattery) { log("Kräver batteri."); return; }
+            if (isSafe) { log("Vapnet är säkrat."); return; }
+            if (arcTimer) return; 
+            runCycle(displayState === "FUNK_MODE" ? "Testar varningsbåge..." : "Skarp varningsbåge!", false);
+        }
+
+        function performKontaktstot() {
+            initAudio();
+            if(isSafe) return;
+            if(arcTimer) return;
+            log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT: Trycker vapnet mot kroppen och sluter kretsen för NMI!</span>");
+            runCycle("NMI påbörjad via Kontaktstöt...", true);
+        }
+
+        function pressTrigger() {
+            initAudio();
+            if (!hasBattery || isSafe) { log("Kräver osäkrat vapen med batteri."); return; }
+            if (arcTimer) return; 
+
+            let currentState = activeChamber === 1 ? chamber1 : chamber2;
+
+            if (currentState === "loaded") {
+                playPopSound();
+                log(`<span style='color:red; font-weight:bold;'>💥 SKOTT AVFYRAT (Kammare ${activeChamber})</span>`);
+                
+                // Målberäkning (NMI)
+                let nmiSuccess = fireDarts(activeChamber);
+
+                if (activeChamber === 1) chamber1 = "fired"; else chamber2 = "fired";
+
+                if(nmiSuccess) {
+                    log("<span style='color:#27ae60; font-weight:bold;'>NMI UPPNÅDD! Strömcykel sluten.</span>");
+                    runCycle("NMI påbörjad...", true);
+                } else {
+                    // Misslyckad NMI
+                    log("<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES! Missade zonen eller för tät spridning.</span>");
+                    targetView.classList.remove('fail-flash');
+                    void targetView.offsetWidth; // trigger reflow
+                    targetView.classList.add('fail-flash');
+                    updateDisplay();
+                }
+
+                // Byt kammare automatiskt
+                let nextChamber = activeChamber === 1 ? 2 : 1;
+                if ((nextChamber === 1 ? chamber1 : chamber2) === "loaded") {
+                    activeChamber = nextChamber;
+                    log(`Växlar till nästa laddade kammare (${activeChamber}). SKJUT IGEN!`);
+                }
+                updateDisplay();
+
+            } else if (currentState === "fired") {
+                log("Återaktiverar NMI i befintliga pilar.");
+                runCycle("Återaktiverar el...", true);
+            } else {
+                log("Tom kammare. (klick)");
+            }
+        }
+
+        function tiltWeapon() {
+            initAudio();
+            if (!hasBattery || isSafe || chamber1 === "empty") { log("Kräver osäkrat vapen & kassetter."); return; }
+            activeChamber = activeChamber === 1 ? 2 : 1;
+            log(`Tiltsensor: Växlar till Kammare ${activeChamber}.`);
+            updateDisplay(); 
+        }
+
+        function initGyro() {
+            initAudio(); 
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(state => {
+                    if (state === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        gyroEnabled = true; log("Gyro aktiverat! Vrid mobilen snabbt för att byta.");
+                        document.getElementById('btn-gyro').style.display = 'none';
+                    } else { log("Åtkomst till Gyro nekades."); }
+                }).catch(e => {});
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                gyroEnabled = true; log("Gyro aktiverat!"); document.getElementById('btn-gyro').style.display = 'none';
+            }
+        }
+
+        function handleOrientation(event) {
+            if (!hasBattery || isSafe || chamber1 === "empty") return;
+            const gamma = event.gamma; const now = Date.now();
+            if (now - lastTiltTime < 1000) return;
+            if (gamma > 60 || gamma < -60) { tiltWeapon(); lastTiltTime = now; }
+        }
+    </script>
+</body>
+</html>
