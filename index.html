@@ -3,56 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - AR Simulator v4.1</title>
+    <title>Taser 7 - Komplett Simulator v4.6</title>
     <style>
         * { box-sizing: border-box; }
 
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-image: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)), url('image_0776ef.png');
+            background-image: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.9)), url('image_0776ef.png');
             background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;
             color: #ecf0f1; display: flex; flex-direction: column; align-items: center;
-            padding: 15px 10px; margin: 0; gap: 15px; overflow-x: hidden;
+            padding: 10px; margin: 0; min-height: 100vh; overflow-x: hidden;
         }
 
         h1.main-title {
-            color: #f1c40f; margin: 0 0 5px 0; font-size: 20px; letter-spacing: 2px;
-            text-align: center; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            color: #f1c40f; margin: 0 0 10px 0; font-size: 20px; letter-spacing: 3px;
+            text-align: center; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,0.9);
         }
 
-        /* ----- VY FRAMÅT (MÅLBILDEN) ----- */
+        /* ----- VY FRAMÅT (MÅLBILDEN) I RUTA ----- */
         .viewport {
             width: 100%; max-width: 400px; height: 350px; 
             border: 3px solid #333; border-radius: 10px;
             position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
             background-color: #050505; cursor: crosshair; touch-action: none;
+            margin-bottom: 15px; 
         }
 
-        /* Mål-behållaren som kan skalas för avstånd och förskjutas i sidled */
+        /* Kamerans video-feed (Bakgrunden) */
+        .camera-feed {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: 0; display: none; 
+        }
+
+        /* Mål-behållaren (Skalas korrekt till människans proportioner) */
         .target-container {
-            position: absolute; top: 50%; left: 50%; width: 100%; height: 100%;
+            position: absolute; top: 50%; left: 50%; width: 400px; height: 800px;
             transform: translate(-50%, -50%) scale(1); transform-origin: center center;
-            transition: transform 0.1s ease-out;
+            transition: transform 0.1s ease-out; z-index: 1;
         }
 
         .target-image {
             width: 100%; height: 100%;
-            background-image: url('image_fd5cbc.png'); background-size: 200% 100%; background-repeat: no-repeat;
-            position: absolute; top: 0; left: 0; transition: filter 0.1s;
+            background-image: url('image_fd5cbc.png'); background-size: 200% 100%; 
+            background-repeat: no-repeat; transition: filter 0.1s;
         }
         .target-front { background-position: left center; }
         .target-back { background-position: right center; }
 
-        .target-image.flash { animation: strobe 0.1s infinite alternate; }
-        @keyframes strobe { 0% { filter: brightness(1); } 100% { filter: brightness(0.2) contrast(1.5); } }
+        .target-image.flash, .camera-feed.flash { animation: strobe 0.1s infinite alternate; }
+        @keyframes strobe { 0% { filter: brightness(1.5); } 100% { filter: brightness(0.2) contrast(1.5); } }
 
-        .target-image.fail-flash { animation: redStrobe 0.2s 3; }
+        .target-image.fail-flash, .camera-feed.fail-flash { animation: redStrobe 0.2s 3; }
         @keyframes redStrobe {
-            0% { filter: drop-shadow(0 0 30px red); }
+            0% { filter: drop-shadow(0 0 30px red) brightness(1.2); }
             100% { filter: drop-shadow(0 0 0px transparent); }
         }
 
-        /* ----- SIKTET (Lasrar & Lampa) ----- */
+        /* ----- SIKTET (Hårkors, Lasrar & Lampa) ----- */
         .aim-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 10;
@@ -62,9 +69,19 @@
             position: absolute; top: 50%; left: 50%; width: 0; height: 0;
             transform: translate(-50%, -50%); transition: top 0.05s linear, left 0.05s linear;
         }
+        
+        .crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
+        }
+        .crosshair::before, .crosshair::after {
+            content: ''; position: absolute; background: rgba(255,255,255,0.5);
+        }
+        .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
+        .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
 
         .flashlight-beam {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 350px; height: 350px;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px;
             background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none;
         }
 
@@ -103,8 +120,8 @@
         }
         .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
         .target-label { color: #f1c40f; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 3px; border: 1px solid #333; }
-        .dist-label { color: #3498db; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 3px; border: 1px solid #333; }
-        
+        .dist-label { color: #3498db; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 3px; border: 1px solid #333; }
+
         /* HUVUDLAYOUT */
         .simulator-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 400px; transform-origin: top center; }
         @media (max-width: 340px) { .simulator-wrapper { transform: scale(0.85); } .viewport { max-width: 340px; } }
@@ -210,6 +227,8 @@
         .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
 
         .btn-gyro { background-color: #8e44ad !important; border-color: #732d91 !important; margin-top: 5px;}
+        .btn-camera { background-color: #27ae60 !important; border-color: #2ecc71 !important; margin-top: 5px;}
+        .active-cam { background-color: #c0392b !important; border-color: #e74c3c !important; }
         .btn-stealth { background-color: #555 !important; border-color: #333 !important; color: #ccc !important;}
         .btn-reset { background-color: #7f8c8d !important; border-color: #626a6b !important; margin-top: 5px;}
 
@@ -243,9 +262,7 @@
         .version-list { list-style-type: none; padding-left: 0; }
         .version-list li { margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed #34495e; }
         .version-number { font-weight: bold; color: #f1c40f; }
-        
-        /* Tangentbords-ikoner styling */
-        .key-icon { background-color: #444; color: #fff; padding: 2px 6px; border-radius: 3px; border: 1px solid #111; font-family: monospace; font-size: 11px;}
+        .key-icon { background-color: #444; color: #fff; padding: 2px 6px; border-radius: 3px; border: 1px solid #111; font-family: monospace; font-size: 10px;}
     </style>
 </head>
 <body>
@@ -254,12 +271,16 @@
         <h1 class="main-title">TASER 7 - Simulator</h1>
         
         <div class="viewport" id="viewport">
+            
+            <video id="camera-feed" class="camera-feed" autoplay playsinline></video>
+
             <div class="target-container" id="target-container">
                 <div class="target-image target-front" id="target-image"></div>
             </div>
             
             <div class="aim-layer">
                 <div class="aim-point" id="aim-point">
+                    <div class="crosshair"></div>
                     <div id="flashlight" class="flashlight-beam"></div>
                     <div id="laser-green" class="laser-green"></div>
                     <div id="laser-red" class="laser-red"></div>
@@ -269,8 +290,8 @@
 
             <div class="hud-overlay">
                 <div class="hud-top">
-                    <div class="target-label" id="target-label">MÅL (FRAMIFRÅN)</div>
-                    <div class="dist-label" id="dist-label">AVSTÅND: 3.0 m</div>
+                    <div class="target-label" id="target-label">PERSON (FRAM)</div>
+                    <div class="dist-label" id="dist-label">3.0 M</div>
                 </div>
             </div>
         </div>
@@ -309,7 +330,7 @@
                     <div id="stat-stealth" class="status-box stealth" style="display:none;">DOLT LÄGE AKTIVT</div>
                 </div>
 
-                <button class="action-btn btn-trigger" id="btn-trigger" onclick="pressTrigger()">AVFYRA SKOTT (SPACE)</button>
+                <button class="action-btn btn-trigger" id="btn-trigger" onclick="pressTrigger()">AVFYRA (SPACE)</button>
                 <button class="action-btn btn-kontaktstot" id="btn-kontaktstot" onclick="performKontaktstot()">UTFÖR KONTAKTSTÖT</button>
                 
                 <div class="btn-grid">
@@ -321,7 +342,7 @@
                 
                 <div class="btn-grid">
                     <button class="action-btn btn-stealth" onclick="activateStealth()">Dolt läge</button>
-                    <button class="action-btn" onclick="tiltWeapon()">Tilt (Dator Z/X)</button>
+                    <button class="action-btn" onclick="tiltWeapon()">Tilt (Z/X)</button>
                 </div>
 
                 <div class="progress-bar-container" id="stealth-progress-container">
@@ -329,9 +350,10 @@
                 </div>
 
                 <div class="btn-grid" id="gyro-controls">
-                    <button class="action-btn btn-gyro" id="btn-gyro" onclick="initGyro()">Aktivera Gyro (AR)</button>
-                    <button class="action-btn" style="display:none;" id="btn-calibrate" onclick="calibrateAim()">Kalibrera Sikte</button>
+                    <button class="action-btn btn-gyro" id="btn-gyro" onclick="initGyro()">Aktivera Gyro</button>
+                    <button class="action-btn btn-camera" id="btn-camera" onclick="toggleCamera()">Byt till Kamera</button>
                 </div>
+                <button class="action-btn" style="display:none;" id="btn-calibrate" onclick="calibrateAim()">Kalibrera Sikte</button>
                 
                 <button class="action-btn btn-reset" onclick="resetSimulator()">ÅTERSTÄLL SIMULATOR</button>
 
@@ -350,31 +372,37 @@
             <button class="modal-close" onclick="closeModal('info-modal')">×</button>
             <h2>Lathund: Taser 7 Simulator</h2>
             <p>Träna handhavande, riktpunkt och verkanskontroll.</p>
-            
-            <h3>1. AR-Sikte & Rörelse</h3>
+
+            <h3>1. Kamera (Rollspel) vs Statisk Bild</h3>
             <ul>
-                <li><strong>På Mobil:</strong> Tryck på <strong>Aktivera Gyro (AR)</strong>. Målet står nu still i rutan. Du siktar genom att vrida telefonen fysiskt. Knuffa telefonen framåt/bakåt (som att ta ett steg) för att gå närmare eller längre bort. Använd <em>Kalibrera</em> om siktet hamnar ur fas.</li>
-                <li><strong>På Dator:</strong> Styr siktet genom att föra muspekaren över mål-rutan. <strong>Scrolla</strong> med musen för att gå närmare eller backa.</li>
+                <li><strong>Statisk bild:</strong> Målet utgörs av en ritad gubbe. Simulatorn känner av exakt var på gubben du träffar. Rör mobilen/musen för att panorera över målet!</li>
+                <li><strong>Kamera (AR):</strong> Tryck på "Byt till Kamera" för att använda telefonens kamera för live-övning. Eftersom simulatorn inte vet var din vän står, godkänns alla skott där pildistansen är tillräcklig (>23 cm). Ni utvärderar därefter själva om träffen satt i en grön zon!</li>
+            </ul>
+            
+            <h3>2. AR-Sikte & Rörelse</h3>
+            <ul>
+                <li><strong>På Mobil:</strong> Tryck <strong>Aktivera Gyro</strong>. Siktet flyttas när du vrider telefonen (målbilden förskjuts i motsatt riktning). Knuffa telefonen fram/bakåt för att gå närmare eller längre bort. Använd <em>Kalibrera</em> om siktet hamnar ur fas. Nyp/zooma för att justera avstånd.</li>
+                <li><strong>På Dator:</strong> Styr siktet med musen över skärmen. Scrolla för att gå närmare eller backa.</li>
             </ul>
 
-            <h3>2. Tangentbordsgenvägar (Dator)</h3>
+            <h3>3. Tangentbordsgenvägar (Dator)</h3>
             <ul>
                 <li><span class="key-icon">SPACE</span> <strong>Avfyra:</strong> Skjuter iväg pilarna.</li>
                 <li><span class="key-icon">SHIFT</span> <strong>Varningsbåge:</strong> Aktiverar strömcykel utan skott.</li>
-                <li><span class="key-icon">Z</span> / <span class="key-icon">X</span> <strong>Byt kammare:</strong> Tryck Z för att välja kammare 1, eller X för att välja kammare 2.</li>
+                <li><span class="key-icon">Z</span> / <span class="key-icon">X</span> <strong>Byt kammare:</strong> Välj direkt kammare 1 eller 2.</li>
             </ul>
 
-            <h3>3. Målbild & NMI</h3>
+            <h3>4. Målbild & NMI</h3>
             <ul>
-                <li>För att uppnå NMI krävs en spridning mellan pilarna på minst 23 cm och en sluten krets. Laserspridningen beror på avstånd och vald kassett (12° eller 3.5°).</li>
+                <li>För att uppnå NMI krävs en spridning på minst 23 cm i godkända zoner. Laserspridningen är dynamisk och drar ihop sig/faller baserat på avstånd och vald kassett (12°/3.5°). Skjuter du från 1 meters håll blir det NMI Misslyckad pga för tät spridning!</li>
                 <li><strong>Gröna zoner:</strong> Mage, ben, rygg. Placera en pil över och en under midjelinjen.</li>
-                <li><strong>Röda zoner:</strong> Huvud, hals, genitalier samt hjärttrakten ska undvikas.</li>
+                <li><strong>Röda zoner:</strong> Undvik huvud, hals, genitalier samt hjärttrakten.</li>
             </ul>
 
-            <h3>4. Skjut & Verkanskontroll</h3>
+            <h3>5. Skjut & Verkanskontroll</h3>
             <ul>
-                <li>Om NMI uppnås aktiveras 5 sekunder ström. Misslyckas NMI blinkar skärmen rött (vapnet byter kammare automatiskt). Skjut igen!</li>
-                <li><strong>Kontaktstöt:</strong> Tryck vapnet mot kroppen för att sluta kretsen om båda kassetter är skjutna.</li>
+                <li>Vid skott träffar pilarna exakt där lasern befann sig. Misslyckas NMI blinkar skärmen rött. Vapnet byter då kammare och du bör skjuta igen.</li>
+                <li><strong>Kontaktstöt:</strong> Tryck vapnet mot kroppen för att sluta kretsen om båda kassetter är skjutna och NMI saknas.</li>
             </ul>
         </div>
     </div>
@@ -384,18 +412,16 @@
             <button class="modal-close" onclick="closeModal('history-modal')">×</button>
             <h2>Versionshistorik</h2>
             <ul class="version-list">
-                <li><span class="version-number">v4.1</span> - <b>Tangentbordsstöd!</b> Lade till genvägar för datoranvändare: Space (Avfyra), Shift (Varningsbåge), samt Z och X för att direkt välja kammare 1 eller 2.</li>
-                <li><span class="version-number">v4.0</span> - <b>AR/FPS-Uppdatering!</b> Fysisk spårning aktiverad. Målet är nu statiskt i miljön. Accelerometern registrerar om du rör dig framåt/bakåt och uppdaterar avståndet. Gyrot styr siktet.</li>
-                <li><span class="version-number">v3.0</span> - Skjutreglage för avstånd implementerat. NMI beräknas matematiskt baserat på dropp i cm/m.</li>
-                <li><span class="version-number">v2.3</span> - Stämningsfull bakgrundsbild inlagd.</li>
-                <li><span class="version-number">v2.2</span> - Interaktivt målsystem med bildens gubbar. Kontaktstöt och NMI-logik inlagd.</li>
-                <li><span class="version-number">v2.1</span> - Slumpmässiga pil-träffar vid avfyrning.</li>
+                <li><span class="version-number">v4.6</span> - <b>Kamera-panorering (Look Around):</b> Genom att siktet nu förskjuter målbilden löstes inzoomnings-problemet helt! Du kan nu zooma in och samtidigt titta upp mot axlar/huvud eller ned mot benen sömlöst. Pilarnas ballistik uppdaterad för att stödja den nya panoreringsmotorn.</li>
+                <li><span class="version-number">v4.5</span> - Slog ihop Kamera-funktionen (Rollspel AR) med de senaste spridnings- och skalningsuppdateringarna samt det klassiska tydliga gränssnittet.</li>
+                <li><span class="version-number">v4.4</span> - Skalningsfix (hela gubben syns). Lasrarna rör sig fysiskt upp/ner beroende på avstånd för att bevisa tät/gles spridning visuellt.</li>
+                <li><span class="version-number">v4.1</span> - Tangentbordsstöd (Space, Shift, Z, X).</li>
+                <li><span class="version-number">v4.0</span> - Fysisk spårning med accelerometern. Telefonen fungerar som ett fönster in i simulatorn.</li>
             </ul>
         </div>
     </div>
 
     <script>
-        // Loggning
         const logBox = document.getElementById('log');
         function log(msg) {
             const entry = document.createElement('div');
@@ -403,7 +429,7 @@
             entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
         }
-        log("Simulator v4.1 (AR + Tangentbord) laddad.");
+        log("Simulator v4.6 laddad (Panorering aktiv).");
 
         function openModal(id) { document.getElementById(id).style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -424,11 +450,18 @@
         let stealthMode = false;
         let targetFacing = 'front'; 
         
-        // Dynamiska 3D Variabler (v4.0)
-        let currentDistance = 3.0; // Utgår från 3 meter
+        // Kamera variabler
+        let useCamera = false;
+        let videoStream = null;
+
+        // Dynamiska 3D Variabler
+        let currentDistance = 3.0; 
+        let baseScale = 0.6; 
         let aimX = 50; 
-        let aimY = 50;
+        let aimY = 50; 
         let targetOffsetX = 0; 
+        let panX = 0; // Panorering X-led
+        let panY = 0; // Panorering Y-led
         
         // Gyro/Motion variabler
         let gyroEnabled = false;
@@ -454,9 +487,10 @@
         const viewport = document.getElementById('viewport');
         const targetContainer = document.getElementById('target-container');
         const targetImage = document.getElementById('target-image');
+        const cameraFeed = document.getElementById('camera-feed');
         const targetLabel = document.getElementById('target-label');
-        const aimPoint = document.getElementById('aim-point');
         const distLabel = document.getElementById('dist-label');
+        const aimPoint = document.getElementById('aim-point');
         
         const flashlight = document.getElementById('flashlight');
         const laserGreen = document.getElementById('laser-green');
@@ -469,42 +503,26 @@
         const stealthProgCont = document.getElementById('stealth-progress-container');
         const stealthProg = document.getElementById('stealth-progress');
         const btnKontaktstot = document.getElementById('btn-kontaktstot');
+        const btnCamera = document.getElementById('btn-camera');
 
-        // ----- NYTT: TANGENTBORDSGENVÄGAR (v4.1) -----
+        // ----- TANGENTBORD -----
         window.addEventListener('keydown', function(event) {
-            // Förhindra att Space scrollar sidan eller dubbelklickar på aktiv knapp
             if (event.code === 'Space') {
-                event.preventDefault(); 
-                pressTrigger();
-            } 
-            // Varningsbåge på Shift
-            else if (event.key === 'Shift') {
-                event.preventDefault();
-                pressSingleWarning();
-            } 
-            // Z = Kammare 1
-            else if (event.key.toLowerCase() === 'z') {
+                event.preventDefault(); pressTrigger();
+            } else if (event.key === 'Shift') {
+                event.preventDefault(); pressSingleWarning();
+            } else if (event.key.toLowerCase() === 'z') {
                 initAudio();
                 if (!hasBattery || isSafe || chamber1 === "empty") return;
-                if (activeChamber !== 1) {
-                    activeChamber = 1;
-                    log(`[Tangentbord] Växlar till Kammare 1.`);
-                    updateDisplay();
-                }
-            } 
-            // X = Kammare 2
-            else if (event.key.toLowerCase() === 'x') {
+                if (activeChamber !== 1) { activeChamber = 1; log(`[Tangentbord] Växlar till Kammare 1.`); updateDisplay(); }
+            } else if (event.key.toLowerCase() === 'x') {
                 initAudio();
                 if (!hasBattery || isSafe || chamber1 === "empty") return;
-                if (activeChamber !== 2) {
-                    activeChamber = 2;
-                    log(`[Tangentbord] Växlar till Kammare 2.`);
-                    updateDisplay();
-                }
+                if (activeChamber !== 2) { activeChamber = 2; log(`[Tangentbord] Växlar till Kammare 2.`); updateDisplay(); }
             }
         });
 
-        // Ljudhantering
+        // ----- LJUD -----
         function initAudio() {
             if (!isAudioInit) {
                 isAudioInit = true;
@@ -562,36 +580,71 @@
             setTimeout(() => { btnLeft.classList.remove('active-press'); btnRight.classList.remove('active-press'); }, 200);
         }
 
-        // ----- AVSTÅND OCH SIKTE -----
+        // ----- KAMERA & MÅL -----
+
+        async function toggleCamera() {
+            if (!useCamera) {
+                try {
+                    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    cameraFeed.srcObject = videoStream;
+                    cameraFeed.style.display = 'block';
+                    targetContainer.style.display = 'none';
+                    
+                    useCamera = true;
+                    btnCamera.textContent = "Statisk Bild";
+                    btnCamera.classList.add('active-cam');
+                    targetLabel.textContent = "KAMERA (AR)";
+                    
+                    log("<span style='color:#f1c40f'>Kamera aktiverad! Simulatorn bedömer nu endast pildistans. Rätt kroppszon bedöms av ER!</span>");
+                } catch (err) {
+                    log("<span style='color:red'>Kunde inte starta kameran. Kräver oftast HTTPS-länk!</span>");
+                }
+            } else {
+                if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); }
+                cameraFeed.style.display = 'none';
+                targetContainer.style.display = 'block';
+                
+                useCamera = false;
+                btnCamera.textContent = "Byt till Kamera";
+                btnCamera.classList.remove('active-cam');
+                randomizeTarget();
+                
+                log("Återgått till statisk bild. Zoner bedöms åter automatiskt.");
+            }
+        }
 
         function randomizeTarget() {
+            if(useCamera) return;
             targetFacing = Math.random() > 0.5 ? 'front' : 'back';
             if(targetFacing === 'front') {
-                targetImage.classList.remove('target-back');
-                targetImage.classList.add('target-front');
-                targetLabel.textContent = "MÅL (FRAMIFRÅN)";
+                targetImage.classList.remove('target-back'); targetImage.classList.add('target-front');
+                targetLabel.textContent = "PERSON (FRAM)";
             } else {
-                targetImage.classList.remove('target-front');
-                targetImage.classList.add('target-back');
-                targetLabel.textContent = "MÅL (BAKIFRÅN)";
+                targetImage.classList.remove('target-front'); targetImage.classList.add('target-back');
+                targetLabel.textContent = "PERSON (BAK)";
             }
         }
 
         randomizeTarget();
 
         function updateAimVisuals() {
-            let scaleFactor = 3.0 / currentDistance; 
-            targetContainer.style.transform = `translate(calc(-50% + ${targetOffsetX}px), -50%) scale(${scaleFactor})`;
+            let scaleFactor = (3.0 / currentDistance) * baseScale; 
+
+            // NYTT: Dynamisk Panorering (Look around)
+            // När vi siktar uppåt/neråt/sidorna förskjuts målet i motsatt riktning.
+            // Skapar illusionen av att vi tittar oss omkring, och zoomar inte bara mot magen!
+            panX = (50 - aimX) * (scaleFactor * 2.0);
+            panY = (50 - aimY) * (scaleFactor * 4.5);
+
+            targetContainer.style.transform = `translate(calc(-50% + ${targetOffsetX + panX}px), calc(-50% + ${panY}px)) scale(${scaleFactor})`;
 
             aimPoint.style.top = aimY + '%';
             aimPoint.style.left = aimX + '%';
 
-            let angle = (activeChamber === 1) ? 12 : 3.5;
-            let dropMeters = currentDistance * Math.tan(angle * Math.PI / 180);
-            let dropPx = (dropMeters * 40) * scaleFactor; 
+            let visualDropPx = (activeChamber === 1) ? 140 : 40; 
+            laserRed.style.top = `${visualDropPx}px`; 
             
-            laserRed.style.top = `${dropPx}px`; 
-            distLabel.textContent = `AVSTÅND: ${currentDistance.toFixed(1)} m`;
+            distLabel.textContent = `${currentDistance.toFixed(1)} M`;
         }
 
         // Mus-fallback för dator
@@ -608,7 +661,7 @@
         viewport.addEventListener('wheel', (e) => {
             e.preventDefault();
             currentDistance += e.deltaY * 0.005; 
-            currentDistance = Math.max(1.0, Math.min(7.0, currentDistance));
+            currentDistance = Math.max(1.0, Math.min(12.0, currentDistance));
             updateAimVisuals();
         }, {passive: false});
 
@@ -624,7 +677,7 @@
                 let newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                 let delta = initialPinchDist - newDist; 
                 currentDistance += delta * 0.02;
-                currentDistance = Math.max(1.0, Math.min(7.0, currentDistance));
+                currentDistance = Math.max(1.0, Math.min(12.0, currentDistance));
                 initialPinchDist = newDist;
                 updateAimVisuals();
             }
@@ -653,7 +706,7 @@
 
         function calibrateAim() {
             calibAlpha = null; calibBeta = null; 
-            aimX = 50; aimY = 50; targetOffsetX = 0;
+            aimX = 50; aimY = 50; targetOffsetX = 0; 
             log("Siktet centrerat.");
         }
 
@@ -693,7 +746,7 @@
             velZ *= 0.85; velX *= 0.85;
             
             currentDistance -= velZ * 0.1;
-            currentDistance = Math.max(1.0, Math.min(7.0, currentDistance));
+            currentDistance = Math.max(1.0, Math.min(12.0, currentDistance));
             
             targetOffsetX += velX * 1.5;
             targetOffsetX = Math.max(-80, Math.min(80, targetOffsetX)); 
@@ -704,6 +757,14 @@
         // ----- SKJUT / NMI LOGIK -----
 
         function checkNMI(tX1, tY1, tX2, tY2) {
+            
+            if (useCamera) {
+                let distPercent = Math.abs(tY1 - tY2);
+                if (distPercent > 12.5) return true;
+                return false;
+            }
+
+            // Statisk bild logik 
             let nx1 = targetFacing === 'front' ? tX1 * 2 : (tX1 - 50) * 2;
             let nx2 = targetFacing === 'front' ? tX2 * 2 : (tX2 - 50) * 2;
 
@@ -719,56 +780,80 @@
             };
 
             if (!checkZone(nx1, tY1) || !checkZone(nx2, tY2)) return false;
-            if (Math.abs(tY1 - tY2) < 13) return false; 
+            if (Math.abs(tY1 - tY2) < 12.5) return false; 
 
             return true;
         }
 
         function fireDarts(chamber) {
-            let scaleFactor = 3.0 / currentDistance;
-            let tX1 = ((aimX - 50) - targetOffsetX/4) / scaleFactor + 50;
-            let tY1 = (aimY - 50) / scaleFactor + 50;
-
-            let angle = (chamber === 1) ? 12 : 3.5;
-            let dropMeters = currentDistance * Math.tan(angle * Math.PI / 180);
-            let dropPercent = (dropMeters * 40); 
             
-            let tX2 = tX1;
-            let tY2 = tY1 + dropPercent;
-
-            const randOffset = () => (Math.random() * 4 - 2) / scaleFactor;
-            tX1 += randOffset(); tY1 += randOffset();
-            tX2 += randOffset(); tY2 += randOffset();
-
-            const dart1 = document.createElement('div'); dart1.className = 'dart-hit';
-            dart1.style.top = tY1 + '%'; dart1.style.left = tX1 + '%';
+            let scaleFactor = (3.0 / currentDistance) * baseScale;
+            let viewportRect = viewport.getBoundingClientRect();
             
-            const dart2 = document.createElement('div'); dart2.className = 'dart-hit';
-            dart2.style.top = tY2 + '%'; dart2.style.left = tX2 + '%';
+            let aimPxX = (aimX / 100) * viewportRect.width;
+            let aimPxY = (aimY / 100) * viewportRect.height;
+            
+            let visualDropPx = (chamber === 1) ? 140 : 40;
+            let redAimPxY = aimPxY + visualDropPx;
+            
+            if (useCamera) {
+                let hit1_X = aimX + (Math.random()*4-2);
+                let hit1_Y = aimY + (Math.random()*4-2);
+                let hit2_X = aimX + (Math.random()*4-2);
+                let hit2_Y = (redAimPxY / viewportRect.height)*100 + (Math.random()*4-2);
 
-            targetContainer.appendChild(dart1);
-            targetContainer.appendChild(dart2);
+                const dart1 = document.createElement('div'); dart1.className = 'dart-hit';
+                dart1.style.top = hit1_Y + '%'; dart1.style.left = hit1_X + '%';
+                
+                const dart2 = document.createElement('div'); dart2.className = 'dart-hit';
+                dart2.style.top = hit2_Y + '%'; dart2.style.left = hit2_X + '%';
 
-            return checkNMI(tX1, tY1, tX2, tY2);
+                viewport.appendChild(dart1);
+                viewport.appendChild(dart2);
+
+                let distPercent = Math.abs(hit1_Y - hit2_Y);
+                return distPercent > 12.5; 
+            } else {
+                // NYTT: Dra av panX och panY i beräkningen så pilarna hamnar exakt under siktet på den förskjutna bilden!
+                let dx1 = aimPxX - (viewportRect.width / 2) - targetOffsetX - panX;
+                let dy1 = aimPxY - (viewportRect.height / 2) - panY;
+                let dx2 = aimPxX - (viewportRect.width / 2) - targetOffsetX - panX;
+                let dy2 = redAimPxY - (viewportRect.height / 2) - panY;
+                
+                let cX1 = dx1 / scaleFactor; let cY1 = dy1 / scaleFactor;
+                let cX2 = dx2 / scaleFactor; let cY2 = dy2 / scaleFactor;
+                
+                let tX1 = ((cX1 + 200) / 400) * 100; let tY1 = ((cY1 + 400) / 800) * 100;
+                let tX2 = ((cX2 + 200) / 400) * 100; let tY2 = ((cY2 + 400) / 800) * 100;
+
+                const randOffset = () => (Math.random() * 3 - 1.5) / scaleFactor;
+                tX1 += randOffset(); tY1 += randOffset();
+                tX2 += randOffset(); tY2 += randOffset();
+
+                const dart1 = document.createElement('div'); dart1.className = 'dart-hit';
+                dart1.style.top = tY1 + '%'; dart1.style.left = tX1 + '%';
+                
+                const dart2 = document.createElement('div'); dart2.className = 'dart-hit';
+                dart2.style.top = tY2 + '%'; dart2.style.left = tX2 + '%';
+
+                targetContainer.appendChild(dart1);
+                targetContainer.appendChild(dart2);
+
+                return checkNMI(tX1, tY1, tX2, tY2);
+            }
         }
 
         function clearDarts() {
-            const darts = document.querySelectorAll('.dart-hit');
-            darts.forEach(dart => dart.remove());
+            document.querySelectorAll('.dart-hit').forEach(dart => dart.remove());
         }
 
         // GUI Taser Updates
         function updateProjectors() {
             if (!isSafe && hasBattery && !stealthMode) {
-                flashlight.style.display = 'block';
-                laserGreen.style.display = 'block';
-                
+                flashlight.style.display = 'block'; laserGreen.style.display = 'block';
                 let currentChamberState = activeChamber === 1 ? chamber1 : chamber2;
-                if(currentChamberState === "loaded") {
-                    laserRed.style.display = 'block';
-                } else {
-                    laserRed.style.display = 'none'; 
-                }
+                if(currentChamberState === "loaded") laserRed.style.display = 'block';
+                else laserRed.style.display = 'none'; 
             } else {
                 flashlight.style.display = 'none'; laserGreen.style.display = 'none'; laserRed.style.display = 'none';
             }
@@ -835,18 +920,21 @@
             statBattery.textContent = "Batteri ur"; statBattery.classList.remove('ok');
             statStealth.style.display = 'none'; btnKontaktstot.style.display = 'none';
             targetImage.classList.remove('flash'); targetImage.classList.remove('fail-flash');
+            cameraFeed.classList.remove('flash'); cameraFeed.classList.remove('fail-flash');
             warningArc.style.display = 'none'; lightning.style.display = 'none';
             
-            clearDarts(); randomizeTarget();
+            clearDarts(); 
+            if(!useCamera) randomizeTarget();
+            
             currentDistance = 3.0; calibrateAim();
 
-            log("<span style='color:#f1c40f'>Systemet har återställts till grundläge.</span>");
+            log("<span style='color:#f1c40f'>Systemet har återställts.</span>");
             updateDisplay();
         }
 
         function toggleCassette() {
             initAudio();
-            if (!isSafe) { log("<span style='color:red'>FEL: Säkra vapnet först!</span>"); return; }
+            if (!isSafe) { log("<span style='color:red'>FEL: Säkra!</span>"); return; }
             if (chamber1 === "empty" && chamber2 === "empty") {
                 chamber1 = "loaded"; chamber2 = "loaded";
                 statCassette.textContent = "Kassetter isatta"; statCassette.classList.add('ok');
@@ -861,7 +949,7 @@
 
         function toggleBattery() {
             initAudio();
-            if (!isSafe) { log("<span style='color:red'>FEL: Säkra vapnet först!</span>"); return; }
+            if (!isSafe) { log("<span style='color:red'>FEL: Säkra!</span>"); return; }
             hasBattery = !hasBattery;
             statBattery.textContent = hasBattery ? "Batteri isatt" : "Batteri ur";
             statBattery.classList.toggle('ok', hasBattery);
@@ -873,9 +961,9 @@
         function pressDualWarning() {
             initAudio(); animateWarningButtons();
             if (!hasBattery) { log("Kräver batteri."); return; }
-            if (!isSafe) { log("Vapnet är redan osäkrat."); return; }
+            if (!isSafe) { log("Vapnet är osäkrat."); return; }
             
-            log("Båda varningsknappar intryckta. (Osäkra nu)");
+            log("Båda varningsknappar intryckta.");
             displayState = "BOOT"; updateDisplay();
             
             clearTimeout(displayTimer);
@@ -886,8 +974,7 @@
 
         function activateStealth() {
             initAudio();
-            if(!hasBattery) { log("Kräver batteri."); return; }
-            if(!isSafe) { log("Vapnet måste vara säkrat för att aktivera dolt läge."); return; }
+            if(!hasBattery || !isSafe) { log("Kräver batteri och säkrat vapen."); return; }
             
             btnLeft.classList.add('active-press'); btnRight.classList.add('active-press');
             stealthProgCont.style.display = 'block'; stealthProg.style.width = '0%';
@@ -929,8 +1016,10 @@
             if (arcTimer) return; 
             log(`<span style='color:#3498db'>${msg} ⚡</span>`);
             
-            if(isFiring) { targetImage.classList.add('flash'); lightning.style.display = 'block'; }
-            else { warningArc.style.display = 'block'; }
+            if(isFiring) { 
+                targetImage.classList.add('flash'); cameraFeed.classList.add('flash');
+                lightning.style.display = 'block'; 
+            } else { warningArc.style.display = 'block'; }
 
             let electricSound = playElectricSound();
             let count = 1; displayEl.innerHTML = "5 SEK<br>CYKEL: " + count;
@@ -939,10 +1028,10 @@
                 count++;
                 if (count > 5) {
                     clearInterval(arcTimer); arcTimer = null;
-                    targetImage.classList.remove('flash'); warningArc.style.display = 'none'; lightning.style.display = 'none';
+                    targetImage.classList.remove('flash'); cameraFeed.classList.remove('flash');
+                    warningArc.style.display = 'none'; lightning.style.display = 'none';
                     stopElectricSound(electricSound);
-                    log("Strömcykel avslutad.");
-                    updateDisplay(); 
+                    log("Strömcykel avslutad."); updateDisplay(); 
                 } else {
                     displayEl.innerHTML = "5 SEK<br>CYKEL: " + count;
                 }
@@ -960,7 +1049,7 @@
         function performKontaktstot() {
             initAudio();
             if(isSafe || arcTimer) return;
-            log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT: Trycker vapnet mot kroppen!</span>");
+            log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>");
             runCycle("NMI påbörjad via Kontaktstöt...", true);
         }
 
@@ -980,13 +1069,21 @@
                 if (activeChamber === 1) chamber1 = "fired"; else chamber2 = "fired";
 
                 if(nmiSuccess) {
-                    log("<span style='color:#27ae60; font-weight:bold;'>NMI UPPNÅDD! Pildistans godkänd.</span>");
+                    if(useCamera) {
+                        log("<span style='color:#f1c40f; font-weight:bold;'>SPRIDNING OK! (Blev det träff i grön zon?)</span>");
+                    } else {
+                        log("<span style='color:#27ae60; font-weight:bold;'>NMI UPPNÅDD! Pildistans godkänd.</span>");
+                    }
                     runCycle("NMI påbörjad...", true);
                 } else {
-                    log("<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> Fel zon eller tät spridning.");
-                    targetImage.classList.remove('fail-flash');
+                    if(useCamera) {
+                        log("<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> För tät spridning.");
+                    } else {
+                        log("<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> Fel zon eller tät spridning.");
+                    }
+                    targetImage.classList.remove('fail-flash'); cameraFeed.classList.remove('fail-flash');
                     void targetImage.offsetWidth; 
-                    targetImage.classList.add('fail-flash');
+                    targetImage.classList.add('fail-flash'); cameraFeed.classList.add('fail-flash');
                     updateDisplay();
                 }
 
