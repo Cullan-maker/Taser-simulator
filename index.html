@@ -3,86 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - FPS Simulator v5.0</title>
+    <title>Taser 7 - AR Simulator v4.1</title>
     <style>
         * { box-sizing: border-box; }
 
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-image: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.9)), url('image_0776ef.png');
+            background-image: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)), url('image_0776ef.png');
             background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;
             color: #ecf0f1; display: flex; flex-direction: column; align-items: center;
-            padding: 10px; margin: 0; min-height: 100vh; overflow-x: hidden;
+            padding: 15px 10px; margin: 0; gap: 15px; overflow-x: hidden;
         }
 
         h1.main-title {
-            color: #f1c40f; margin: 0 0 10px 0; font-size: 20px; letter-spacing: 3px;
-            text-align: center; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,0.9);
+            color: #f1c40f; margin: 0 0 5px 0; font-size: 20px; letter-spacing: 2px;
+            text-align: center; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
-        /* ----- HUVUDLAYOUT (FPS VY) ----- */
-        .simulator-wrapper { 
-            position: relative; width: 100%; max-width: 450px; 
-            height: 85vh; min-height: 650px; border-radius: 20px; 
-            border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 60px rgba(0,0,0,0.9);
-            overflow: hidden; background: #050505;
-        }
-
-        /* 3D-Världen (Målbilden) som fyller hela rutan */
+        /* ----- VY FRAMÅT (MÅLBILDEN) ----- */
         .viewport {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1; cursor: crosshair; touch-action: none;
-            display: flex; justify-content: center; align-items: center;
+            width: 100%; max-width: 400px; height: 350px; 
+            border: 3px solid #333; border-radius: 10px;
+            position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            background-color: #050505; cursor: crosshair; touch-action: none;
         }
 
-        /* Container för bilden så hit-zoner räknas rätt oavsett skärmhöjd */
+        /* Mål-behållaren som kan skalas för avstånd och förskjutas i sidled */
         .target-container {
-            position: absolute; top: 50%; left: 50%; width: 800px; height: 800px;
+            position: absolute; top: 50%; left: 50%; width: 100%; height: 100%;
             transform: translate(-50%, -50%) scale(1); transform-origin: center center;
             transition: transform 0.1s ease-out;
         }
 
         .target-image {
             width: 100%; height: 100%;
-            background-image: url('image_fd5cbc.png'); background-size: 200% auto; 
-            background-repeat: no-repeat; transition: filter 0.1s;
+            background-image: url('image_fd5cbc.png'); background-size: 200% 100%; background-repeat: no-repeat;
+            position: absolute; top: 0; left: 0; transition: filter 0.1s;
         }
-        .target-front { background-position: 0% 50%; }
-        .target-back { background-position: 100% 50%; }
+        .target-front { background-position: left center; }
+        .target-back { background-position: right center; }
 
         .target-image.flash { animation: strobe 0.1s infinite alternate; }
-        @keyframes strobe { 0% { filter: brightness(1.5); } 100% { filter: brightness(0.2) contrast(1.5); } }
+        @keyframes strobe { 0% { filter: brightness(1); } 100% { filter: brightness(0.2) contrast(1.5); } }
 
         .target-image.fail-flash { animation: redStrobe 0.2s 3; }
         @keyframes redStrobe {
-            0% { filter: drop-shadow(0 0 50px red) brightness(1.2); }
+            0% { filter: drop-shadow(0 0 30px red); }
             100% { filter: drop-shadow(0 0 0px transparent); }
         }
 
-        /* ----- SIKTET (Hårkors, Lasrar & Lampa) ----- */
+        /* ----- SIKTET (Lasrar & Lampa) ----- */
         .aim-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 10;
         }
 
         .aim-point {
-            position: absolute; top: 35%; left: 50%; width: 0; height: 0;
+            position: absolute; top: 50%; left: 50%; width: 0; height: 0;
             transform: translate(-50%, -50%); transition: top 0.05s linear, left 0.05s linear;
         }
-        
-        /* Subtilt hårkors */
-        .crosshair {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
-        }
-        .crosshair::before, .crosshair::after {
-            content: ''; position: absolute; background: rgba(255,255,255,0.5);
-        }
-        .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
-        .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
 
         .flashlight-beam {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 350px; height: 350px;
             background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none;
         }
 
@@ -116,28 +98,23 @@
 
         /* Avståndsmätare / UI Overlay */
         .hud-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; padding: 15px;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; padding: 10px;
             display: flex; flex-direction: column; justify-content: space-between;
         }
         .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
-        .target-label { color: #f1c40f; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); padding: 6px 10px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); letter-spacing: 1px;}
-        .dist-label { color: #3498db; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); padding: 6px 10px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); letter-spacing: 1px;}
-
-        /* ----- WEAPON & UI LAYER (Ligger framför vyn) ----- */
-        .weapon-ui-layer {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            display: flex; flex-direction: column; align-items: center;
-            z-index: 100; pointer-events: none; /* Klick går igenom till viewport, förutom på knappar */
-        }
+        .target-label { color: #f1c40f; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 3px; border: 1px solid #333; }
+        .dist-label { color: #3498db; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 3px; border: 1px solid #333; }
+        
+        /* HUVUDLAYOUT */
+        .simulator-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 400px; transform-origin: top center; }
+        @media (max-width: 340px) { .simulator-wrapper { transform: scale(0.85); } .viewport { max-width: 340px; } }
+        .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; }
 
         /* ----- TASER 7 ENHET ----- */
         .taser-device {
-            pointer-events: auto;
-            width: 280px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%);
-            border-radius: 40px 40px 10px 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1);
-            position: relative; padding-bottom: 20px; border: 2px solid #111; 
-            margin-bottom: -40px; /* Trycker in vapnet bakom glaset */
-            z-index: 2;
+            width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%);
+            border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1);
+            position: relative; padding-bottom: 20px; border: 2px solid #111; z-index: 2; margin-top: -10px;
         }
 
         .warning-arc {
@@ -150,8 +127,8 @@
         .sight-dot { width: 10px; height: 10px; background-color: #fff; border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
 
         .display-bezel {
-            background-color: #050505; margin: 15px auto; width: 180px; height: 70px; border-radius: 8px; border: 2px solid #222;
-            display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px #000;
+            background-color: #111; margin: 15px auto; width: 180px; height: 70px; border-radius: 10px; border: 3px solid #000;
+            display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
         }
         .display-screen {
             width: 160px; height: 50px; background-color: #050505; color: #ffff00; font-family: 'Courier New', Courier, monospace;
@@ -207,74 +184,74 @@
         }
         .safety-switch.unsafe { background-color: #e74c3c; }
         .safety-switch.unsafe::after { left: 42px; }
-        .safety-label { text-align: center; font-weight: bold; margin-top: 6px; color: #111; font-size: 12px; letter-spacing: 1px;}
+        .safety-label { text-align: center; font-weight: bold; margin-top: 6px; color: #111; font-size: 13px; }
 
-        /* ----- KONTROLLPANEL (Handtaget i "Frostigt glas") ----- */
+        /* ----- KONTROLLPANEL ----- */
         .sim-controls {
-            pointer-events: auto; width: 100%; 
-            background: rgba(20, 25, 30, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            padding: 55px 15px 15px 15px; border-top: 1px solid rgba(255,255,255,0.1); position: relative; z-index: 1; 
+            width: 270px; background-color: #2c3e50; padding: 35px 15px 15px 15px; border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8);
+            margin-top: -25px; border: 2px solid #1a252f; border-top: none; position: relative; z-index: 1; 
         }
         
         button.action-btn {
-            width: 100%; background: rgba(52, 73, 94, 0.6); color: white; border: 1px solid rgba(255,255,255,0.1);
-            padding: 10px 6px; margin-bottom: 6px; border-radius: 8px; cursor: pointer; backdrop-filter: blur(5px);
-            font-weight: bold; font-size: 11px; letter-spacing: 0.5px; touch-action: manipulation; transition: 0.1s;
+            width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 10px 6px; margin-bottom: 6px; border-radius: 5px; cursor: pointer;
+            font-weight: bold; font-size: 11px; touch-action: manipulation; transition: 0.1s;
         }
-        button.action-btn:active { transform: scale(0.98); background: rgba(52, 73, 94, 0.9); }
+        button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
         
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
         .btn-grid .action-btn { margin-bottom: 0; }
 
-        .btn-info { background: rgba(41, 128, 185, 0.7) !important; border-color: rgba(52, 152, 219, 0.5) !important; margin-bottom: 10px !important;}
+        .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 10px !important;}
         
-        .btn-trigger { background: rgba(192, 57, 43, 0.9) !important; border-color: #e74c3c !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 4px 0 rgba(123, 36, 28, 0.8); margin-bottom: 15px !important;}
-        .btn-trigger:active { box-shadow: 0 0 0 rgba(123, 36, 28, 0.8); transform: translateY(4px); }
+        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 12px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-bottom: 10px !important;}
+        .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
         
-        .btn-kontaktstot { background: rgba(230, 126, 34, 0.9) !important; border-color: #d35400 !important; font-size: 12px !important; padding: 12px !important; display: none; box-shadow: 0 4px 0 rgba(186, 74, 0, 0.8); margin-bottom: 15px !important;}
-        .btn-kontaktstot:active { box-shadow: 0 0 0 rgba(186, 74, 0, 0.8); transform: translateY(4px); }
+        .btn-kontaktstot { background-color: #e67e22 !important; border-color: #d35400 !important; font-size: 12px !important; padding: 10px !important; display: none; box-shadow: 0 3px 0 #ba4a00; margin-bottom: 10px !important;}
+        .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
 
-        .btn-gyro { background: rgba(142, 68, 173, 0.7) !important; border-color: rgba(155, 89, 182, 0.5) !important; margin-top: 5px;}
-        .btn-stealth { background: rgba(85, 85, 85, 0.6) !important; border-color: rgba(100, 100, 100, 0.3) !important; color: #ccc !important;}
-        .btn-reset { background: rgba(127, 140, 141, 0.5) !important; border-color: rgba(149, 165, 166, 0.3) !important; margin-top: 5px;}
+        .btn-gyro { background-color: #8e44ad !important; border-color: #732d91 !important; margin-top: 5px;}
+        .btn-stealth { background-color: #555 !important; border-color: #333 !important; color: #ccc !important;}
+        .btn-reset { background-color: #7f8c8d !important; border-color: #626a6b !important; margin-top: 5px;}
 
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px; }
-        .status-box { background: rgba(0,0,0,0.5); padding: 6px; text-align: center; border-radius: 5px; font-size: 10px; font-weight: bold; border: 1px solid rgba(231, 76, 60, 0.5); color: #e74c3c;}
-        .status-box.ok { border-color: rgba(39, 174, 96, 0.5); color: #2ecc71; }
-        .status-box.stealth { border-color: rgba(155, 89, 182, 0.5); color: #9b59b6; grid-column: span 2;}
+        .status-box { background: #111; padding: 6px; text-align: center; border-radius: 3px; font-size: 10px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
+        .status-box.ok { border-color: #27ae60; color: #27ae60; }
+        .status-box.stealth { border-color: #9b59b6; color: #9b59b6; grid-column: span 2;}
 
-        .log-box { background: rgba(0,0,0,0.6); color: #2ecc71; font-family: monospace; font-size: 10px; height: 75px; overflow-y: auto; padding: 8px; border-radius: 8px; margin-top: 10px; border: 1px solid rgba(255,255,255,0.05);}
-        .log-entry { margin-bottom: 3px; border-bottom: 1px dotted rgba(255,255,255,0.1); padding-bottom: 2px;}
+        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 10px; height: 80px; overflow-y: auto; padding: 8px; border-radius: 5px; margin-top: 10px; border: 1px solid #222;}
+        .log-entry { margin-bottom: 3px; border-bottom: 1px dotted #333; padding-bottom: 2px;}
 
-        .progress-bar-container { width: 100%; height: 4px; background: rgba(0,0,0,0.5); border-radius: 2px; display: none; margin-bottom: 6px;}
+        .progress-bar-container { width: 100%; height: 6px; background: #222; border-radius: 3px; display: none; margin-bottom: 6px;}
         .progress-bar { width: 0%; height: 100%; background: #9b59b6; transition: width 0.1s linear;}
 
-        .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #888; }
-        .footer a { color: #bbb; text-decoration: none; transition: color 0.2s; }
+        .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #aaa; }
+        .footer a { color: #ccc; text-decoration: none; transition: color 0.2s; }
         .footer a:hover { color: #fff; text-decoration: underline; }
 
         /* ----- MODALER ----- */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(3px); z-index: 200; justify-content: center; align-items: center; padding: 15px;}
-        .modal-content { background: rgba(44, 62, 80, 0.95); width: 100%; max-width: 500px; max-height: 90vh; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); padding: 25px 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 20px 50px rgba(0,0,0,0.9);}
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 15px;}
+        .modal-content { background: #2c3e50; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 10px; border: 2px solid #f1c40f; padding: 25px 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 10px 40px rgba(0,0,0,0.9);}
+        .modal-content.history-style { border-color: #3498db; }
         .modal-close { position: absolute; top: 10px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
         .modal-close:hover { color: #c0392b; }
-        .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-size: 18px; letter-spacing: 1px;}
+        .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 10px; font-size: 18px;}
         .history-style h2 { color: #3498db; }
-        .modal-content h3 { color: #3498db; margin-top: 15px; margin-bottom: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;}
-        .modal-content p, .modal-content li { font-size: 12px; line-height: 1.5; color: #bdc3c7;}
+        .modal-content h3 { color: #3498db; margin-top: 15px; margin-bottom: 8px; font-size: 14px; }
+        .modal-content p, .modal-content li { font-size: 12px; line-height: 1.4; color: #bdc3c7;}
         .modal-content ul, .modal-content ol { padding-left: 20px; margin-top: 5px; }
         .modal-content li { margin-bottom: 5px; }
         .version-list { list-style-type: none; padding-left: 0; }
-        .version-list li { margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed rgba(255,255,255,0.1); }
+        .version-list li { margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed #34495e; }
         .version-number { font-weight: bold; color: #f1c40f; }
-        .key-icon { background-color: rgba(0,0,0,0.5); color: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); font-family: monospace; font-size: 10px;}
+        
+        /* Tangentbords-ikoner styling */
+        .key-icon { background-color: #444; color: #fff; padding: 2px 6px; border-radius: 3px; border: 1px solid #111; font-family: monospace; font-size: 11px;}
     </style>
 </head>
 <body>
 
-    <h1 class="main-title">TASER 7</h1>
-
     <div class="simulator-wrapper">
+        <h1 class="main-title">TASER 7 - Simulator</h1>
         
         <div class="viewport" id="viewport">
             <div class="target-container" id="target-container">
@@ -283,7 +260,6 @@
             
             <div class="aim-layer">
                 <div class="aim-point" id="aim-point">
-                    <div class="crosshair"></div>
                     <div id="flashlight" class="flashlight-beam"></div>
                     <div id="laser-green" class="laser-green"></div>
                     <div id="laser-red" class="laser-red"></div>
@@ -293,14 +269,13 @@
 
             <div class="hud-overlay">
                 <div class="hud-top">
-                    <div class="target-label" id="target-label">PERSON (FRAM)</div>
-                    <div class="dist-label" id="dist-label">3.0 M</div>
+                    <div class="target-label" id="target-label">MÅL (FRAMIFRÅN)</div>
+                    <div class="dist-label" id="dist-label">AVSTÅND: 3.0 m</div>
                 </div>
             </div>
         </div>
         
-        <div class="weapon-ui-layer">
-            
+        <div class="main-container">
             <div class="taser-device">
                 <div id="warning-arc" class="warning-arc"></div>
                 <div class="sights">
@@ -325,6 +300,7 @@
             </div>
 
             <div class="sim-controls">
+                
                 <button class="action-btn btn-info" onclick="openModal('info-modal')">ℹ️ Lathund & Instruktioner</button>
 
                 <div class="status-grid">
@@ -333,7 +309,7 @@
                     <div id="stat-stealth" class="status-box stealth" style="display:none;">DOLT LÄGE AKTIVT</div>
                 </div>
 
-                <button class="action-btn btn-trigger" id="btn-trigger" onclick="pressTrigger()">AVFYRA (SPACE)</button>
+                <button class="action-btn btn-trigger" id="btn-trigger" onclick="pressTrigger()">AVFYRA SKOTT (SPACE)</button>
                 <button class="action-btn btn-kontaktstot" id="btn-kontaktstot" onclick="performKontaktstot()">UTFÖR KONTAKTSTÖT</button>
                 
                 <div class="btn-grid">
@@ -341,11 +317,11 @@
                     <button class="action-btn" onclick="toggleBattery()">Batteri i/ur</button>
                 </div>
                 
-                <button class="action-btn" style="border-color: rgba(241, 196, 15, 0.5); color: #f1c40f;" onclick="pressDualWarning()">Funktionskontroll</button>
+                <button class="action-btn" style="border-color: #f1c40f; color: #f1c40f;" onclick="pressDualWarning()">Funktionskontroll</button>
                 
                 <div class="btn-grid">
                     <button class="action-btn btn-stealth" onclick="activateStealth()">Dolt läge</button>
-                    <button class="action-btn" onclick="tiltWeapon()">Tilt (Z/X)</button>
+                    <button class="action-btn" onclick="tiltWeapon()">Tilt (Dator Z/X)</button>
                 </div>
 
                 <div class="progress-bar-container" id="stealth-progress-container">
@@ -363,11 +339,10 @@
             </div>
         </div>
 
-    </div>
-
-    <div class="footer">
-        <a href="#" onclick="openModal('history-modal'); return false;">Versionshistorik</a><br><br>
-        &copy; Cullibrick 2026
+        <div class="footer">
+            <a href="#" onclick="openModal('history-modal'); return false;">Versionshistorik</a><br><br>
+            &copy; Cullibrick 2026
+        </div>
     </div>
 
     <div id="info-modal" class="modal-overlay">
@@ -378,7 +353,7 @@
             
             <h3>1. AR-Sikte & Rörelse</h3>
             <ul>
-                <li><strong>På Mobil:</strong> Tryck på <strong>Aktivera Gyro (AR)</strong>. Målet står nu still i rutan. Siktet flyttas när du vrider telefonen fysiskt. Knuffa telefonen framåt/bakåt (som att ta ett steg) för att gå närmare eller längre bort. Använd <em>Kalibrera</em> om siktet hamnar ur fas. Du kan också <em>nypa/zooma</em> för att justera avstånd.</li>
+                <li><strong>På Mobil:</strong> Tryck på <strong>Aktivera Gyro (AR)</strong>. Målet står nu still i rutan. Du siktar genom att vrida telefonen fysiskt. Knuffa telefonen framåt/bakåt (som att ta ett steg) för att gå närmare eller längre bort. Använd <em>Kalibrera</em> om siktet hamnar ur fas.</li>
                 <li><strong>På Dator:</strong> Styr siktet genom att föra muspekaren över mål-rutan. <strong>Scrolla</strong> med musen för att gå närmare eller backa.</li>
             </ul>
 
@@ -386,20 +361,20 @@
             <ul>
                 <li><span class="key-icon">SPACE</span> <strong>Avfyra:</strong> Skjuter iväg pilarna.</li>
                 <li><span class="key-icon">SHIFT</span> <strong>Varningsbåge:</strong> Aktiverar strömcykel utan skott.</li>
-                <li><span class="key-icon">Z</span> / <span class="key-icon">X</span> <strong>Byt kammare:</strong> Välj direkt kammare 1 eller 2.</li>
+                <li><span class="key-icon">Z</span> / <span class="key-icon">X</span> <strong>Byt kammare:</strong> Tryck Z för att välja kammare 1, eller X för att välja kammare 2.</li>
             </ul>
 
             <h3>3. Målbild & NMI</h3>
             <ul>
-                <li>För att uppnå NMI krävs en spridning på minst 23 cm i godkända zoner. Laserspridningen beror på avstånd och vald kassett (12°/3.5°).</li>
+                <li>För att uppnå NMI krävs en spridning mellan pilarna på minst 23 cm och en sluten krets. Laserspridningen beror på avstånd och vald kassett (12° eller 3.5°).</li>
                 <li><strong>Gröna zoner:</strong> Mage, ben, rygg. Placera en pil över och en under midjelinjen.</li>
-                <li><strong>Röda zoner:</strong> Undvik huvud, hals, genitalier samt hjärttrakten.</li>
+                <li><strong>Röda zoner:</strong> Huvud, hals, genitalier samt hjärttrakten ska undvikas.</li>
             </ul>
 
             <h3>4. Skjut & Verkanskontroll</h3>
             <ul>
-                <li>Vid skott träffar pilarna exakt där siktet befann sig. Misslyckas NMI blinkar skärmen rött. Vapnet byter då kammare och du bör skjuta igen.</li>
-                <li><strong>Kontaktstöt:</strong> Tryck vapnet mot kroppen för att sluta kretsen om båda kassetter är skjutna och NMI saknas.</li>
+                <li>Om NMI uppnås aktiveras 5 sekunder ström. Misslyckas NMI blinkar skärmen rött (vapnet byter kammare automatiskt). Skjut igen!</li>
+                <li><strong>Kontaktstöt:</strong> Tryck vapnet mot kroppen för att sluta kretsen om båda kassetter är skjutna.</li>
             </ul>
         </div>
     </div>
@@ -409,17 +384,18 @@
             <button class="modal-close" onclick="closeModal('history-modal')">×</button>
             <h2>Versionshistorik</h2>
             <ul class="version-list">
-                <li><span class="version-number">v5.0</span> - <b>Smäckrare Design (FPS Update)!</b> Gjort om layouten helt. Målet är nu integrerat bakom vapnet och menyerna som en helskärms-FPS-upplevelse. Använder "Glassmorphism" (frostade menyer) för bättre inlevelse. Lade till ett riktkors. Siktets standardhöjd justerades upp.</li>
-                <li><span class="version-number">v4.1</span> - Tangentbordsstöd inlagt för FPS-upplevelse på PC (Space, Shift, Z, X).</li>
-                <li><span class="version-number">v4.0</span> - AR-spårning aktiverad. Målet är statiskt, telefonens gyro/accelerometer styr sikte och avstånd (parallax). Riktig NMI-beräkning baserad på faktiska träffkoordinater och avstånd.</li>
-                <li><span class="version-number">v3.0</span> - Skjutreglage för avstånd. Laserspridning och dropp beräknas i cm/m.</li>
-                <li><span class="version-number">v2.2</span> - Bildens gubbar blev målytor. Kontaktstöt och avancerad NMI-logik inlagd.</li>
-                <li><span class="version-number">v2.1</span> - Slumpmässiga, dynamiska pil-träffar vid avfyrning.</li>
+                <li><span class="version-number">v4.1</span> - <b>Tangentbordsstöd!</b> Lade till genvägar för datoranvändare: Space (Avfyra), Shift (Varningsbåge), samt Z och X för att direkt välja kammare 1 eller 2.</li>
+                <li><span class="version-number">v4.0</span> - <b>AR/FPS-Uppdatering!</b> Fysisk spårning aktiverad. Målet är nu statiskt i miljön. Accelerometern registrerar om du rör dig framåt/bakåt och uppdaterar avståndet. Gyrot styr siktet.</li>
+                <li><span class="version-number">v3.0</span> - Skjutreglage för avstånd implementerat. NMI beräknas matematiskt baserat på dropp i cm/m.</li>
+                <li><span class="version-number">v2.3</span> - Stämningsfull bakgrundsbild inlagd.</li>
+                <li><span class="version-number">v2.2</span> - Interaktivt målsystem med bildens gubbar. Kontaktstöt och NMI-logik inlagd.</li>
+                <li><span class="version-number">v2.1</span> - Slumpmässiga pil-träffar vid avfyrning.</li>
             </ul>
         </div>
     </div>
 
     <script>
+        // Loggning
         const logBox = document.getElementById('log');
         function log(msg) {
             const entry = document.createElement('div');
@@ -427,7 +403,7 @@
             entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
         }
-        log("Simulator v5.0 (FPS Glassmorphism) laddad.");
+        log("Simulator v4.1 (AR + Tangentbord) laddad.");
 
         function openModal(id) { document.getElementById(id).style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -448,10 +424,10 @@
         let stealthMode = false;
         let targetFacing = 'front'; 
         
-        // Dynamiska 3D Variabler (v5.0: startar aimY högre pga layout)
-        let currentDistance = 3.0; 
+        // Dynamiska 3D Variabler (v4.0)
+        let currentDistance = 3.0; // Utgår från 3 meter
         let aimX = 50; 
-        let aimY = 35; // Sikta ovanför vapnet
+        let aimY = 50;
         let targetOffsetX = 0; 
         
         // Gyro/Motion variabler
@@ -479,8 +455,8 @@
         const targetContainer = document.getElementById('target-container');
         const targetImage = document.getElementById('target-image');
         const targetLabel = document.getElementById('target-label');
-        const distLabel = document.getElementById('dist-label');
         const aimPoint = document.getElementById('aim-point');
+        const distLabel = document.getElementById('dist-label');
         
         const flashlight = document.getElementById('flashlight');
         const laserGreen = document.getElementById('laser-green');
@@ -494,20 +470,37 @@
         const stealthProg = document.getElementById('stealth-progress');
         const btnKontaktstot = document.getElementById('btn-kontaktstot');
 
-        // Tangentbordsgenvägar
+        // ----- NYTT: TANGENTBORDSGENVÄGAR (v4.1) -----
         window.addEventListener('keydown', function(event) {
+            // Förhindra att Space scrollar sidan eller dubbelklickar på aktiv knapp
             if (event.code === 'Space') {
-                event.preventDefault(); pressTrigger();
-            } else if (event.key === 'Shift') {
-                event.preventDefault(); pressSingleWarning();
-            } else if (event.key.toLowerCase() === 'z') {
+                event.preventDefault(); 
+                pressTrigger();
+            } 
+            // Varningsbåge på Shift
+            else if (event.key === 'Shift') {
+                event.preventDefault();
+                pressSingleWarning();
+            } 
+            // Z = Kammare 1
+            else if (event.key.toLowerCase() === 'z') {
                 initAudio();
                 if (!hasBattery || isSafe || chamber1 === "empty") return;
-                if (activeChamber !== 1) { activeChamber = 1; log(`[Tangentbord] Växlar till Kammare 1.`); updateDisplay(); }
-            } else if (event.key.toLowerCase() === 'x') {
+                if (activeChamber !== 1) {
+                    activeChamber = 1;
+                    log(`[Tangentbord] Växlar till Kammare 1.`);
+                    updateDisplay();
+                }
+            } 
+            // X = Kammare 2
+            else if (event.key.toLowerCase() === 'x') {
                 initAudio();
                 if (!hasBattery || isSafe || chamber1 === "empty") return;
-                if (activeChamber !== 2) { activeChamber = 2; log(`[Tangentbord] Växlar till Kammare 2.`); updateDisplay(); }
+                if (activeChamber !== 2) {
+                    activeChamber = 2;
+                    log(`[Tangentbord] Växlar till Kammare 2.`);
+                    updateDisplay();
+                }
             }
         });
 
@@ -574,19 +567,20 @@
         function randomizeTarget() {
             targetFacing = Math.random() > 0.5 ? 'front' : 'back';
             if(targetFacing === 'front') {
-                targetImage.classList.remove('target-back'); targetImage.classList.add('target-front');
-                targetLabel.textContent = "PERSON (FRAM)";
+                targetImage.classList.remove('target-back');
+                targetImage.classList.add('target-front');
+                targetLabel.textContent = "MÅL (FRAMIFRÅN)";
             } else {
-                targetImage.classList.remove('target-front'); targetImage.classList.add('target-back');
-                targetLabel.textContent = "PERSON (BAK)";
+                targetImage.classList.remove('target-front');
+                targetImage.classList.add('target-back');
+                targetLabel.textContent = "MÅL (BAKIFRÅN)";
             }
         }
 
         randomizeTarget();
 
         function updateAimVisuals() {
-            // Justerad scaleFactor för den nya 800x800 containern (på 3m är vi scale 0.8)
-            let scaleFactor = (3.0 / currentDistance) * 0.8; 
+            let scaleFactor = 3.0 / currentDistance; 
             targetContainer.style.transform = `translate(calc(-50% + ${targetOffsetX}px), -50%) scale(${scaleFactor})`;
 
             aimPoint.style.top = aimY + '%';
@@ -594,12 +588,10 @@
 
             let angle = (activeChamber === 1) ? 12 : 3.5;
             let dropMeters = currentDistance * Math.tan(angle * Math.PI / 180);
-            
-            // Anpassad pixel drop-rate för den nya viewport-höjden (~700px)
-            let dropPx = (dropMeters * 20) * scaleFactor; 
+            let dropPx = (dropMeters * 40) * scaleFactor; 
             
             laserRed.style.top = `${dropPx}px`; 
-            distLabel.textContent = `${currentDistance.toFixed(1)} M`;
+            distLabel.textContent = `AVSTÅND: ${currentDistance.toFixed(1)} m`;
         }
 
         // Mus-fallback för dator
@@ -661,7 +653,7 @@
 
         function calibrateAim() {
             calibAlpha = null; calibBeta = null; 
-            aimX = 50; aimY = 35; targetOffsetX = 0; // Återställ högre upp
+            aimX = 50; aimY = 50; targetOffsetX = 0;
             log("Siktet centrerat.");
         }
 
@@ -682,7 +674,7 @@
             let deltaY = beta - calibBeta;
 
             aimX = 50 + (deltaX * -1.5);
-            aimY = 35 + (deltaY * -2.0);
+            aimY = 50 + (deltaY * -2.0);
 
             aimX = Math.max(0, Math.min(100, aimX));
             aimY = Math.max(0, Math.min(100, aimY));
@@ -727,22 +719,19 @@
             };
 
             if (!checkZone(nx1, tY1) || !checkZone(nx2, tY2)) return false;
-            if (Math.abs(tY1 - tY2) < 10) return false; // NMI check för 800px-grid
+            if (Math.abs(tY1 - tY2) < 13) return false; 
 
             return true;
         }
 
         function fireDarts(chamber) {
-            let scaleFactor = (3.0 / currentDistance) * 0.8;
-            
-            let viewportRect = viewport.getBoundingClientRect();
-            // Approximera träff via viewports proportioner i relation till containern
+            let scaleFactor = 3.0 / currentDistance;
             let tX1 = ((aimX - 50) - targetOffsetX/4) / scaleFactor + 50;
-            let tY1 = ((aimY - 50) * (viewportRect.height / 800)) / scaleFactor + 50;
+            let tY1 = (aimY - 50) / scaleFactor + 50;
 
             let angle = (chamber === 1) ? 12 : 3.5;
             let dropMeters = currentDistance * Math.tan(angle * Math.PI / 180);
-            let dropPercent = (dropMeters * 20); // Base drop i target-%
+            let dropPercent = (dropMeters * 40); 
             
             let tX2 = tX1;
             let tY2 = tY1 + dropPercent;
@@ -773,9 +762,13 @@
             if (!isSafe && hasBattery && !stealthMode) {
                 flashlight.style.display = 'block';
                 laserGreen.style.display = 'block';
+                
                 let currentChamberState = activeChamber === 1 ? chamber1 : chamber2;
-                if(currentChamberState === "loaded") laserRed.style.display = 'block';
-                else laserRed.style.display = 'none'; 
+                if(currentChamberState === "loaded") {
+                    laserRed.style.display = 'block';
+                } else {
+                    laserRed.style.display = 'none'; 
+                }
             } else {
                 flashlight.style.display = 'none'; laserGreen.style.display = 'none'; laserRed.style.display = 'none';
             }
@@ -847,13 +840,13 @@
             clearDarts(); randomizeTarget();
             currentDistance = 3.0; calibrateAim();
 
-            log("<span style='color:#f1c40f'>Systemet har återställts.</span>");
+            log("<span style='color:#f1c40f'>Systemet har återställts till grundläge.</span>");
             updateDisplay();
         }
 
         function toggleCassette() {
             initAudio();
-            if (!isSafe) { log("<span style='color:red'>FEL: Säkra!</span>"); return; }
+            if (!isSafe) { log("<span style='color:red'>FEL: Säkra vapnet först!</span>"); return; }
             if (chamber1 === "empty" && chamber2 === "empty") {
                 chamber1 = "loaded"; chamber2 = "loaded";
                 statCassette.textContent = "Kassetter isatta"; statCassette.classList.add('ok');
@@ -868,7 +861,7 @@
 
         function toggleBattery() {
             initAudio();
-            if (!isSafe) { log("<span style='color:red'>FEL: Säkra!</span>"); return; }
+            if (!isSafe) { log("<span style='color:red'>FEL: Säkra vapnet först!</span>"); return; }
             hasBattery = !hasBattery;
             statBattery.textContent = hasBattery ? "Batteri isatt" : "Batteri ur";
             statBattery.classList.toggle('ok', hasBattery);
@@ -880,9 +873,9 @@
         function pressDualWarning() {
             initAudio(); animateWarningButtons();
             if (!hasBattery) { log("Kräver batteri."); return; }
-            if (!isSafe) { log("Vapnet är osäkrat."); return; }
+            if (!isSafe) { log("Vapnet är redan osäkrat."); return; }
             
-            log("Båda varningsknappar intryckta.");
+            log("Båda varningsknappar intryckta. (Osäkra nu)");
             displayState = "BOOT"; updateDisplay();
             
             clearTimeout(displayTimer);
@@ -893,7 +886,8 @@
 
         function activateStealth() {
             initAudio();
-            if(!hasBattery || !isSafe) { log("Kräver batteri och säkrat vapen."); return; }
+            if(!hasBattery) { log("Kräver batteri."); return; }
+            if(!isSafe) { log("Vapnet måste vara säkrat för att aktivera dolt läge."); return; }
             
             btnLeft.classList.add('active-press'); btnRight.classList.add('active-press');
             stealthProgCont.style.display = 'block'; stealthProg.style.width = '0%';
@@ -947,7 +941,8 @@
                     clearInterval(arcTimer); arcTimer = null;
                     targetImage.classList.remove('flash'); warningArc.style.display = 'none'; lightning.style.display = 'none';
                     stopElectricSound(electricSound);
-                    log("Strömcykel avslutad."); updateDisplay(); 
+                    log("Strömcykel avslutad.");
+                    updateDisplay(); 
                 } else {
                     displayEl.innerHTML = "5 SEK<br>CYKEL: " + count;
                 }
@@ -989,7 +984,9 @@
                     runCycle("NMI påbörjad...", true);
                 } else {
                     log("<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> Fel zon eller tät spridning.");
-                    targetImage.classList.remove('fail-flash'); void targetImage.offsetWidth; targetImage.classList.add('fail-flash');
+                    targetImage.classList.remove('fail-flash');
+                    void targetImage.offsetWidth; 
+                    targetImage.classList.add('fail-flash');
                     updateDisplay();
                 }
 
